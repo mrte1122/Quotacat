@@ -31,9 +31,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.updateIcon() }
+            .sink { [weak self] _ in self?.updateIcon(); self?.applyTheme() }
             .store(in: &cancellables)
 
+        applyTheme()
         if UserDefaults.standard.bool(forKey: SettingsKey.notificationsEnabled) {
             store.notifier.requestAuthorization()
         }
@@ -41,6 +42,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.start()
         updater.notifier = store.notifier
         updater.start()
+    }
+
+    /// Applied per window (not NSApp-wide) so the menu-bar icon keeps matching the menu bar.
+    private func applyTheme() {
+        let appearance = ThemeChoice.current.appearance
+        popover.appearance = appearance
+        settingsWindow?.appearance = appearance
     }
 
     private func updateIcon() {
@@ -73,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.isReleasedWhenClosed = false
             w.center()
             settingsWindow = w
+            applyTheme()
         }
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)

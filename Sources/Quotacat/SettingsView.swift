@@ -101,6 +101,7 @@ private struct GeneralSettings: View {
 
 private struct AppearanceSettings: View {
     @AppStorage(SettingsKey.iconStyle) private var iconStyle = IconStyle.progressBar.rawValue
+    @AppStorage(SettingsKey.theme) private var theme = ThemeChoice.system.rawValue
     @AppStorage(SettingsKey.monochrome) private var monochrome = false
     @AppStorage(SettingsKey.showRemaining) private var showRemaining = false
     @AppStorage(SettingsKey.showLabels) private var showLabels = true
@@ -110,6 +111,14 @@ private struct AppearanceSettings: View {
 
     var body: some View {
         Form {
+            Section("Theme") {
+                Picker("Popover and Settings", selection: $theme) {
+                    ForEach(ThemeChoice.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                Text("System follows your Mac's Light or Dark setting. The menu-bar icon always matches the menu bar.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Menu bar") {
                 Picker("Icon style", selection: $iconStyle) {
                     ForEach(IconStyle.allCases) { Text($0.title).tag($0.rawValue) }

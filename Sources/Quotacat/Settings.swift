@@ -1,4 +1,29 @@
+import AppKit
 import Foundation
+
+/// Theme for the popover and Settings window. The menu-bar icon always follows the menu bar.
+enum ThemeChoice: String, CaseIterable, Identifiable {
+    case system, light, dark
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+    /// nil means "inherit the system appearance".
+    var appearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
+    static var current: ThemeChoice {
+        ThemeChoice(rawValue: UserDefaults.standard.string(forKey: SettingsKey.theme) ?? "") ?? .system
+    }
+}
 
 enum IconStyle: String, CaseIterable, Identifiable {
     case progressBar, battery, percentage, textOnly
@@ -16,6 +41,7 @@ enum IconStyle: String, CaseIterable, Identifiable {
 enum SettingsKey {
     static let refreshInterval = "refreshInterval"        // seconds, 10...300
     static let iconStyle = "iconStyle"
+    static let theme = "theme"
     static let monochrome = "monochrome"
     static let showRemaining = "showRemaining"
     static let showLabels = "showLabels"
@@ -37,6 +63,7 @@ enum SettingsKey {
         var d: [String: Any] = [
             refreshInterval: 60.0,
             iconStyle: IconStyle.progressBar.rawValue,
+            theme: ThemeChoice.system.rawValue,
             monochrome: false,
             showRemaining: false,
             showLabels: true,

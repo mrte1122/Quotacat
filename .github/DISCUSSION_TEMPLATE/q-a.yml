@@ -1,0 +1,66 @@
+title: "[Question] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying Quotacat! A few answers that cover most questions:
+
+        - **Actions or Copilot cards say "Needs the `user` scope"**: run `gh auth refresh -h github.com -s user`, then click refresh in the popover.
+        - **macOS says the app can't be opened**: go to System Settings → Privacy & Security and click **Open Anyway** (first launch only).
+        - **My included minutes or requests look wrong**: GitHub doesn't report your plan to the app, so set them in Settings → Quotas.
+
+        Found a bug instead? Please [open an issue](https://github.com/mrte1122/Quotacat/issues/new).
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What are you trying to do, and what happened?
+    validations:
+      required: true
+
+  - type: input
+    id: quotacat-version
+    attributes:
+      label: Quotacat version
+      description: Settings → General → About
+      placeholder: "1.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: "macOS 26.0 (Apple silicon)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: sign-in
+    attributes:
+      label: How is Quotacat signed in?
+      options:
+        - GitHub CLI (gh)
+        - Personal access token in Settings
+        - Not signed in / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: once-output
+    attributes:
+      label: Output of `--once` (optional)
+      description: |
+        Run this in Terminal and paste the result. It never prints your token, but double-check before posting:
+        `~/Applications/Quotacat.app/Contents/MacOS/Quotacat --once`
+      render: shell
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before posting
+      options:
+        - label: I've removed any tokens, private repository names, or billing details I don't want public.
+          required: true

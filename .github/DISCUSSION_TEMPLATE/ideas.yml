@@ -1,0 +1,55 @@
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea for Quotacat? Describe the problem first; the best solution isn't always the first one that comes to mind.
+        Upvote existing ideas instead of posting duplicates.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What happened that made you wish Quotacat did something different?
+      placeholder: "I got an Actions bill because a scheduled workflow ran all weekend, and I didn't notice until..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What should Quotacat do? Mockups or screenshots are welcome.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Quotacat?
+      multiple: true
+      options:
+        - REST / GraphQL / Search rate limits
+        - Actions minutes
+        - Copilot premium requests
+        - A GitHub quota Quotacat doesn't track yet (Codespaces, Packages, storage, LFS…)
+        - Organization or team accounts
+        - Menu-bar icon
+        - Popover
+        - Notifications
+        - Settings
+        - Something else
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How do you handle this today?
+      description: Workarounds, other tools, or "I don't".
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd be up for opening a pull request for this.

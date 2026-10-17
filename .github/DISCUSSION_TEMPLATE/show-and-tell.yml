@@ -1,0 +1,26 @@
+title: "[Show] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Show off your setup: menu-bar style, a shell prompt that reads Quotacat's cache file, a script, or how Quotacat saved you from a surprise bill.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What did you make or set up?
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drag an image in. Crop out anything private, like your usage numbers or repository names.
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Config or code (optional)
+      description: Prompt snippets, scripts, or settings others could copy.
+      render: shell

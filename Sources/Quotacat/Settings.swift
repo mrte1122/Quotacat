@@ -51,3 +51,9 @@ enum SettingsKey {
         UserDefaults.standard.register(defaults: d)
     }
 }
+
+enum Links {
+    static let tip = URL(string: "https://ko-fi.com/mrte90")!
+    static let repo = URL(string: "https://github.com/mrte1122/Quotacat")!
+    static let billing = URL(string: "https://github.com/settings/billing")!
+}

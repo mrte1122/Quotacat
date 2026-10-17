@@ -96,7 +96,12 @@ struct PopoverView: View {
         HStack {
             Button("Settings…", action: openSettings)
             Spacer()
-            Link("Billing", destination: URL(string: "https://github.com/settings/billing")!)
+            Link("Billing", destination: Links.billing)
+            Spacer()
+            Link(destination: Links.tip) {
+                Image(systemName: "heart.fill").foregroundStyle(.pink)
+            }
+            .help("Enjoying Quotacat? Buy me a coffee on Ko-fi")
             Spacer()
             Button("Quit") { NSApp.terminate(nil) }
         }

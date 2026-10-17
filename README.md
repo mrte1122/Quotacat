@@ -9,6 +9,12 @@
 </p>
 
 <p align="center">
+  <a href="https://ko-fi.com/mrte90"><img src="https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-blue" alt="macOS 14+">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
+</p>
+
+<p align="center">
   <img src="docs/menubar-dark.png" height="28" alt="Menu bar icon">
 </p>
 
@@ -105,6 +111,11 @@ $Q --launch-at-login on|off   # same as the Settings toggle
 
 See [DESIGN.md](DESIGN.md) for the data sources, pace math, and architecture. The interaction model
 is inspired by [Claude Usage Tracker](https://github.com/hamed-elfayome/Claude-Usage-Tracker).
+
+## Support
+
+Quotacat is free. If it's useful to you, you can [buy me a coffee on Ko-fi](https://ko-fi.com/mrte90) ☕️
+Bug reports and pull requests are welcome too.
 
 ## License
 

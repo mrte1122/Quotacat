@@ -56,6 +56,18 @@ private struct GeneralSettings: View {
                         }
                     }
             }
+            Section("About") {
+                LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")
+                HStack {
+                    Link("Source on GitHub", destination: Links.repo)
+                    Spacer()
+                    Link(destination: Links.tip) {
+                        Label("Buy me a coffee", systemImage: "cup.and.saucer.fill")
+                    }
+                }
+                Text("Quotacat is free and open source. If it saves you a surprise bill, a tip is appreciated.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }

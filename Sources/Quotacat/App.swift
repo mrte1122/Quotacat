@@ -1,0 +1,77 @@
+import AppKit
+import Combine
+import SwiftUI
+
+/// NSStatusItem + NSPopover, like Claude Usage's `StatusBarUIManager` (rather than MenuBarExtra,
+/// which forces template rendering on the label and loses the status colors).
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let store = UsageStore()
+    private var statusItem: NSStatusItem!
+    private let popover = NSPopover()
+    private var settingsWindow: NSWindow?
+    private var cancellables = Set<AnyCancellable>()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(togglePopover)
+        statusItem.button?.imagePosition = .imageOnly
+
+        let host = NSHostingController(rootView: PopoverView(store: store) { [weak self] in self?.openSettings() })
+        host.sizingOptions = .preferredContentSize
+        popover.contentViewController = host
+        popover.behavior = .transient
+
+        // objectWillChange fires before the new value lands; redraw on the next runloop turn.
+        store.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateIcon() }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateIcon() }
+            .store(in: &cancellables)
+
+        if UserDefaults.standard.bool(forKey: SettingsKey.notificationsEnabled) {
+            store.notifier.requestAuthorization()
+        }
+        updateIcon()
+        store.start()
+    }
+
+    private func updateIcon() {
+        statusItem.button?.image = MenuBarIconRenderer.render(store: store)
+        statusItem.button?.toolTip = tooltip
+    }
+
+    private var tooltip: String {
+        MetricKind.allCases.compactMap { k in
+            store.metrics[k].map { "\(k.title): \(Int(($0.fraction * 100).rounded()))%" }
+        }.joined(separator: "\n")
+    }
+
+    @objc private func togglePopover() {
+        guard let button = statusItem.button else { return }
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
+        }
+    }
+
+    func openSettings() {
+        popover.performClose(nil)
+        if settingsWindow == nil {
+            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(store: store)))
+            w.title = "Quotacat Settings"
+            w.styleMask = [.titled, .closable]
+            w.isReleasedWhenClosed = false
+            w.center()
+            settingsWindow = w
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+}

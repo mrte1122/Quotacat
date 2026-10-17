@@ -31,7 +31,7 @@ enum Snapshot {
             // Render through a real NSHostingView (not ImageRenderer) so AppKit-backed
             // buttons and links draw instead of placeholder blocks.
             for (name, appearanceName) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
-                let view = PopoverView(store: store, openSettings: {})
+                let view = PopoverView(store: store, updater: Updater(), openSettings: {})
                     .background(Color(nsColor: .windowBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 let host = NSHostingView(rootView: view)

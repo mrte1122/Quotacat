@@ -7,6 +7,7 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let store = UsageStore()
+    let updater = Updater()
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var settingsWindow: NSWindow?
@@ -18,7 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.action = #selector(togglePopover)
         statusItem.button?.imagePosition = .imageOnly
 
-        let host = NSHostingController(rootView: PopoverView(store: store) { [weak self] in self?.openSettings() })
+        let host = NSHostingController(rootView: PopoverView(store: store, updater: updater) { [weak self] in self?.openSettings() })
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
         popover.behavior = .transient
@@ -38,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         updateIcon()
         store.start()
+        updater.notifier = store.notifier
+        updater.start()
     }
 
     private func updateIcon() {
@@ -64,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func openSettings() {
         popover.performClose(nil)
         if settingsWindow == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(store: store)))
+            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(store: store, updater: updater)))
             w.title = "Quotacat Settings"
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false

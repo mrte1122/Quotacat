@@ -51,7 +51,8 @@ final class Notifier {
         UserDefaults.standard.set(Array(sent.sorted().suffix(300)), forKey: SettingsKey.sentNotifications)
     }
 
-    private func post(title: String, body: String) {
+    func post(title: String, body: String) {
+        guard available else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

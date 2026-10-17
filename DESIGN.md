@@ -58,7 +58,23 @@ monitor for Claude plan limits. Quotacat shares no code with it. It adopts these
    usual install locations are probed directly.
 2. A personal access token saved in the macOS Keychain from Settings → Account.
 
-The token is only sent to `api.github.com`. Quotacat has no telemetry, analytics, or update pings.
+The token is only sent to `api.github.com`. Quotacat has no telemetry or analytics. The only request it makes beyond your own API calls is the
+anonymous daily update check described below.
+
+## Updates
+
+- Releases are GitHub Releases with two assets: `Quotacat.zip` (always that name, so
+  `releases/latest/download/Quotacat.zip` is a permanent download link) and `Quotacat.zip.sig`.
+- The signature is Ed25519 over the zip bytes. The private key stays on the maintainer's Mac
+  (`~/.config/quotacat/update-signing-key`); the public key is compiled into `Updater.swift`.
+- The app checks `GET /repos/mrte1122/Quotacat/releases/latest` 15 seconds after launch and then
+  at most once a day, unauthenticated. A newer version shows an Update button and one notification.
+- Installing downloads both assets, verifies the signature, unzips with `ditto`, checks the bundle
+  identifier, version and code signature, swaps the bundle in place with
+  `FileManager.replaceItemAt`, and relaunches through a detached `open`. Any failure leaves the
+  installed app untouched and links to the releases page.
+- Files downloaded by the app itself don't get a quarantine flag, so updates don't trigger
+  Gatekeeper again. Only the first manual download does, until the app is notarized.
 
 ## Usage levels
 
@@ -94,4 +110,11 @@ Sources/Quotacat/
   PopoverView.swift    dashboard cards, banner, breakdowns, daily charts
   SettingsView.swift   General / Appearance / Account / Quotas tabs
   Snapshot.swift       offscreen renders of the popover and icons (README screenshots)
+  Updater.swift        release check, signature verification, in-place install and relaunch
+
+scripts/
+  build-app.sh         universal build, icon packing, ad-hoc signing, --install / --zip
+  release.sh           version bump, signed zip, tag, push, GitHub release
+  sign-update.swift    Ed25519 key generation and signing
+  make-icon.swift      fallback icon renderer; clean-icon.swift cuts out a generated icon
 ```

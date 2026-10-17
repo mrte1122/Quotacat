@@ -1,12 +1,13 @@
 #!/bin/bash
 # Builds a universal (Apple silicon + Intel) Quotacat.app into ./build.
 #   --install   also copy it to ~/Applications
-#   --zip       also produce build/Quotacat-<version>.zip for a GitHub release
+#   --zip       also produce build/Quotacat.zip for a GitHub release
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="1.0.0"
-BUILD_NUMBER="1"
+# The version lives in ./VERSION; QUOTACAT_VERSION overrides it (used to test updates).
+VERSION="${QUOTACAT_VERSION:-$(tr -d '[:space:]' < VERSION)}"
+BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 BUNDLE_ID="io.github.mrte1122.Quotacat"
 APP="build/Quotacat.app"
 
@@ -67,8 +68,10 @@ for arg in "$@"; do
             echo "Installed to ~/Applications/Quotacat.app"
             ;;
         --zip)
-            ditto -c -k --keepParent "$APP" "build/Quotacat-${VERSION}.zip"
-            echo "Packaged build/Quotacat-${VERSION}.zip"
+            # Stable name so releases/latest/download/Quotacat.zip always works.
+            rm -f build/Quotacat.zip
+            ditto -c -k --keepParent "$APP" build/Quotacat.zip
+            echo "Packaged build/Quotacat.zip"
             ;;
     esac
 done

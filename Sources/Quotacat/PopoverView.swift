@@ -3,6 +3,7 @@ import SwiftUI
 
 struct PopoverView: View {
     @ObservedObject var store: UsageStore
+    @ObservedObject var updater: Updater
     var openSettings: () -> Void
 
     @AppStorage(SettingsKey.paceColoring) private var paceColoring = true
@@ -11,6 +12,7 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            updateBanner
             banner
             section("API rate limits", kinds: MetricKind.rateLimits)
             section("This month", kinds: MetricKind.billing)
@@ -58,6 +60,45 @@ struct PopoverView: View {
     }
 
     // Mirrors Claude Usage's StatusBannerView: "Refresh failed %d times", credentials problems.
+    // Shown only when there's something to act on; "up to date" stays in Settings.
+    @ViewBuilder private var updateBanner: some View {
+        switch updater.state {
+        case .available(let release):
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.down.circle.fill").font(.title3).foregroundStyle(.blue)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Quotacat \(release.version) is available").font(.callout.weight(.medium))
+                    Link("What's new", destination: release.pageURL).font(.caption)
+                }
+                Spacer()
+                Button("Update") { Task { await updater.install(release) } }
+                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+            }
+            .padding(8)
+            .background(Color.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+        case .installing(let step):
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(step).font(.callout)
+                Spacer()
+            }
+            .padding(8)
+            .background(Color.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Update failed").font(.caption.bold())
+                Text(message).font(.caption).fixedSize(horizontal: false, vertical: true)
+                Link("Open the releases page", destination: Updater.releasesPage).font(.caption)
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        default:
+            EmptyView()
+        }
+    }
+
     @ViewBuilder private var banner: some View {
         if let err = store.lastError {
             Label {

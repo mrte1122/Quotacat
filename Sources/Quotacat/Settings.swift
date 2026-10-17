@@ -27,6 +27,9 @@ enum SettingsKey {
     static let copilotQuota = "copilotQuota"
     static let preferPAT = "preferPAT"
     static let sentNotifications = "sentNotifications"
+    static let autoUpdateCheck = "autoUpdateCheck"
+    static let lastUpdateCheck = "lastUpdateCheck"
+    static let notifiedUpdateVersion = "notifiedUpdateVersion"
 
     static func menuBar(_ kind: MetricKind) -> String { "menuBar.\(kind.rawValue)" }
 
@@ -44,6 +47,7 @@ enum SettingsKey {
             actionsQuota: 2000.0,   // GitHub Free; Pro is 3000
             copilotQuota: 300.0,    // Copilot Pro; Free is 50, Pro+ is 1500
             preferPAT: false,
+            autoUpdateCheck: true,
         ]
         for k in MetricKind.allCases {
             d[menuBar(k)] = (k == .core || k == .actions || k == .copilot)

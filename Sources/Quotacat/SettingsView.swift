@@ -3,10 +3,11 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var store: UsageStore
+    @ObservedObject var updater: Updater
 
     var body: some View {
         TabView {
-            GeneralSettings(store: store).tabItem { Label("General", systemImage: "gearshape") }
+            GeneralSettings(store: store, updater: updater).tabItem { Label("General", systemImage: "gearshape") }
             AppearanceSettings().tabItem { Label("Appearance", systemImage: "menubar.rectangle") }
             AccountSettings(store: store).tabItem { Label("Account", systemImage: "person.crop.circle") }
             QuotaSettings(store: store).tabItem { Label("Quotas", systemImage: "gauge.with.dots.needle.50percent") }
@@ -18,6 +19,8 @@ struct SettingsView: View {
 
 private struct GeneralSettings: View {
     @ObservedObject var store: UsageStore
+    @ObservedObject var updater: Updater
+    @AppStorage(SettingsKey.autoUpdateCheck) private var autoUpdate = true
     @AppStorage(SettingsKey.refreshInterval) private var interval = 60.0
     @AppStorage(SettingsKey.notificationsEnabled) private var notifications = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -30,6 +33,18 @@ private struct GeneralSettings: View {
         case ...90: return "Balanced"
         case ...180: return "Power efficient"
         default: return "Battery saver"
+        }
+    }
+
+    private var updateStatus: String {
+        switch updater.state {
+        case .checking: return "Checking…"
+        case .upToDate: return "Quotacat is up to date."
+        case .available(let r): return "Version \(r.version) is available."
+        case .installing(let step): return step
+        case .failed(let message): return message
+        case .idle:
+            return updater.lastChecked.map { "Last checked \($0.formatted(.relative(presentation: .named)))." } ?? "Not checked yet."
         }
     }
 
@@ -57,7 +72,18 @@ private struct GeneralSettings: View {
                     }
             }
             Section("About") {
-                LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")
+                LabeledContent("Version", value: Updater.currentVersion)
+                HStack {
+                    Text(updateStatus).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    if let release = updater.availableRelease {
+                        Button("Install \(release.version)") { Task { await updater.install(release) } }
+                    } else {
+                        Button("Check for Updates") { Task { await updater.check(userInitiated: true) } }
+                            .disabled(updater.state == .checking)
+                    }
+                }
+                Toggle("Check for updates automatically (daily)", isOn: $autoUpdate)
                 HStack {
                     Link("Source on GitHub", destination: Links.repo)
                     Spacer()

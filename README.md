@@ -48,10 +48,29 @@ Also included:
 - Launch at login
 - A JSON cache file for shell prompts
 
-## Install
+## Download
 
-Requires macOS 14 or later and the Swift toolchain (Xcode or just the Command Line Tools:
-`xcode-select --install`).
+**[⬇ Download Quotacat for macOS](https://github.com/mrte1122/Quotacat/releases/latest/download/Quotacat.zip)**
+(macOS 14 or later, Apple silicon and Intel)
+
+1. Unzip it and drag **Quotacat.app** into **Applications**.
+2. Open it. Quotacat isn't notarized by Apple yet, so the first launch is blocked with a
+   warning. Go to **System Settings → Privacy & Security**, scroll down, and click
+   **Open Anyway**. Or run `xattr -dr com.apple.quarantine /Applications/Quotacat.app`.
+3. Look for the gauges in your menu bar. Quotacat has no Dock icon.
+
+You only need to do step 2 once; updates install without it.
+
+## Updates
+
+Quotacat checks GitHub for a new release once a day and shows an **Update** button in the
+popover when one is available. Updates are signed: each release ships an Ed25519 signature, and
+the app refuses any download that doesn't match the key built into it. You can also check from
+**Settings → General → Check for Updates**, or turn automatic checks off.
+
+## Build from source
+
+Requires the Swift toolchain (Xcode, or just the Command Line Tools: `xcode-select --install`).
 
 ```bash
 git clone https://github.com/mrte1122/Quotacat.git
@@ -59,12 +78,6 @@ cd Quotacat
 ./scripts/build-app.sh --install
 open ~/Applications/Quotacat.app
 ```
-
-The build is universal (Apple silicon and Intel) and ad-hoc signed.
-
-> **Downloading a prebuilt release instead?** Releases aren't notarized by Apple, so macOS will
-> say the app "can't be opened". Right-click the app and choose **Open**, or run
-> `xattr -dr com.apple.quarantine /Applications/Quotacat.app`.
 
 ## Sign in
 
@@ -85,7 +98,9 @@ in **Settings → Quotas**.
 ## Privacy
 
 - Your token is only sent to `api.github.com`.
-- There is no telemetry, analytics, or update check.
+- The daily update check is an anonymous request for this repo's latest release; no token or
+  identifier is sent, and you can turn it off in Settings.
+- There is no telemetry or analytics.
 - Usage data stays on your Mac, in `~/Library/Application Support/Quotacat/usage.json`.
 
 ## Shell prompt
@@ -105,7 +120,19 @@ $Q --selftest                 # run the pace and countdown math checks
 $Q --once                     # fetch once and print a summary (never prints your token)
 $Q --snapshot DIR [--demo]    # render the popover and icons to PNGs; --demo uses sample data
 $Q --launch-at-login on|off   # same as the Settings toggle
+$Q --check-update             # print the latest release version
+$Q --update                   # download, verify, and install the latest release
 ```
+
+## Releasing (maintainers)
+
+```bash
+swift scripts/sign-update.swift keygen   # once; the key lives in ~/.config/quotacat, never in the repo
+./scripts/release.sh 1.2.0 "What changed"
+```
+
+`release.sh` bumps `VERSION`, builds the universal app, signs `Quotacat.zip`, tags, pushes, and
+creates the GitHub release.
 
 ## Design
 

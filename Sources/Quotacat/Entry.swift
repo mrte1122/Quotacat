@@ -10,6 +10,9 @@ enum Entry {
 
         if args.contains("--selftest") { exit(SelfTest.run()) }
         if args.contains("--once") { runOnce() }
+        if args.contains("--check-update") || args.contains("--update") {
+            runUpdate(install: args.contains("--update"))
+        }
         if let i = args.firstIndex(of: "--launch-at-login"), i + 1 < args.count {
             let service = SMAppService.mainApp
             do {
@@ -52,6 +55,38 @@ enum Entry {
             }
             print("cache:", UsageStore.cacheURL.path)
             exit(store.lastError == nil ? 0 : 1)
+        }
+        RunLoop.main.run()
+        exit(0)
+    }
+
+    /// `--check-update` reports the latest release; `--update` also installs it (no relaunch).
+    @MainActor
+    private static func runUpdate(install: Bool) -> Never {
+        _ = NSApplication.shared
+        let updater = Updater()
+        Task { @MainActor in
+            print("installed:", Updater.currentVersion, "at", Bundle.main.bundleURL.path)
+            await updater.check(userInitiated: true)
+            switch updater.state {
+            case .available(let release):
+                print("available:", release.version)
+                if install {
+                    await updater.install(release, relaunch: false)
+                    if case .failed(let message) = updater.state { print("error:", message); exit(1) }
+                    let plist = NSDictionary(contentsOf: Bundle.main.bundleURL.appendingPathComponent("Contents/Info.plist"))
+                    print("installed now:", plist?["CFBundleShortVersionString"] as? String ?? "?")
+                }
+                exit(0)
+            case .upToDate:
+                print("up to date")
+                exit(0)
+            case .failed(let message):
+                print("error:", message)
+                exit(1)
+            default:
+                exit(1)
+            }
         }
         RunLoop.main.run()
         exit(0)

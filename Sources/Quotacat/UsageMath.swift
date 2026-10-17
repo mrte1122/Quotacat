@@ -128,6 +128,11 @@ enum SelfTest {
         let b = UsageMath.monthBounds(containing: mid)
         check(ISO8601DateFormatter().string(from: b.start) == "2026-10-01T00:00:00Z", "month start")
         check(ISO8601DateFormatter().string(from: b.end) == "2026-11-01T00:00:00Z", "month end")
+        check(Updater.isVersion("1.1.0", newerThan: "1.0.0"), "version minor bump")
+        check(Updater.isVersion("1.10.0", newerThan: "1.9.0"), "version numeric not lexical")
+        check(Updater.isVersion("2.0", newerThan: "1.9.9"), "version different lengths")
+        check(!Updater.isVersion("1.0.0", newerThan: "1.0.0"), "version equal")
+        check(!Updater.isVersion("1.0.0", newerThan: "1.0.1"), "version older")
         print(failures == 0 ? "All self-tests passed" : "\(failures) self-test(s) failed")
         return failures == 0 ? 0 : 1
     }

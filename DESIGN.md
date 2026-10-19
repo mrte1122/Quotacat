@@ -76,8 +76,11 @@ anonymous daily update check described below.
   identifier, version and code signature, swaps the bundle in place with
   `FileManager.replaceItemAt`, and relaunches through a detached `open`. Any failure leaves the
   installed app untouched and links to the releases page.
-- Files downloaded by the app itself don't get a quarantine flag, so updates don't trigger
-  Gatekeeper again. Only the first manual download does, until the app is notarized.
+- Releases are signed with a Developer ID (hardened runtime) and notarized, with the ticket
+  stapled, so first downloads pass Gatekeeper. Once the running app has a Developer ID team, the
+  updater also requires the new bundle to come from the same team.
+- The bundle is assembled and signed in `$TMPDIR`, not the repo: iCloud-synced folders like
+  `~/Documents` add extended attributes that codesign rejects.
 
 ## Usage levels
 

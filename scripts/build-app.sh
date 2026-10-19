@@ -28,7 +28,11 @@ SIGN_IDENTITY="${QUOTACAT_SIGN_IDENTITY:-$(security find-identity -v -p codesign
 VERSION="${QUOTACAT_VERSION:-$(tr -d '[:space:]' < VERSION)}"
 BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 BUNDLE_ID="io.github.mrte1122.Quotacat"
-APP="build/Quotacat.app"
+# Assemble and sign outside the repo: if it lives in an iCloud-synced folder (like ~/Documents),
+# File Provider keeps adding extended attributes to the bundle and codesign rejects them.
+STAGE="${TMPDIR:-/tmp}/quotacat-build"
+APP="$STAGE/Quotacat.app"
+mkdir -p build
 
 # Build each architecture separately and merge with lipo; a single multi-arch
 # `swift build` needs full Xcode, while this works with the Command Line Tools.
@@ -38,13 +42,13 @@ for arch in arm64 x86_64; do
     BINS+=("$(swift build -c release --arch "$arch" --show-bin-path)/Quotacat")
 done
 
-rm -rf "$APP"
+rm -rf "$STAGE"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 lipo -create "${BINS[@]}" -output "$APP/Contents/MacOS/Quotacat"
 
 # App icon: render the fallback if missing, then pack every macOS size into an .icns.
 [[ -f Resources/AppIcon.png ]] || swift scripts/make-icon.swift Resources/AppIcon.png
-ICONSET="build/AppIcon.iconset"
+ICONSET="$STAGE/AppIcon.iconset"
 rm -rf "$ICONSET" && mkdir -p "$ICONSET"
 for s in 16 32 128 256 512; do
     sips -z $s $s Resources/AppIcon.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
@@ -85,7 +89,7 @@ else
     SIGNED_AS="ad-hoc"
 fi
 codesign --verify --strict "$APP"
-echo "Built $APP ($(lipo -archs "$APP/Contents/MacOS/Quotacat"), signed: $SIGNED_AS)"
+echo "Built Quotacat.app ($(lipo -archs "$APP/Contents/MacOS/Quotacat"), signed: $SIGNED_AS)"
 
 if [[ $ZIP -eq 1 ]]; then
     # Stable name so releases/latest/download/Quotacat.zip always works.
@@ -102,6 +106,10 @@ if [[ $ZIP -eq 1 ]]; then
     fi
     echo "Packaged build/Quotacat.zip"
 fi
+
+# Keep a copy in ./build for running and testing (the zip above is what gets shipped).
+rm -rf build/Quotacat.app
+ditto "$APP" build/Quotacat.app
 
 if [[ $INSTALL -eq 1 ]]; then
     mkdir -p "$HOME/Applications"

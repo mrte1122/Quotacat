@@ -55,18 +55,17 @@ Also included:
 (macOS 14 or later, Apple silicon and Intel)
 
 1. Unzip it and drag **Quotacat.app** into **Applications**.
-2. Open it. Quotacat isn't notarized by Apple yet, so the first launch is blocked with a
-   warning. Go to **System Settings → Privacy & Security**, scroll down, and click
-   **Open Anyway**. Or run `xattr -dr com.apple.quarantine /Applications/Quotacat.app`.
-3. Look for the gauges in your menu bar. Quotacat has no Dock icon.
+2. Open it, and look for the gauges in your menu bar. Quotacat has no Dock icon.
 
-You only need to do step 2 once; updates install without it.
+Quotacat is signed with an Apple Developer ID and notarized by Apple, so it opens without
+security warnings.
 
 ## Updates
 
 Quotacat checks GitHub for a new release once a day and shows an **Update** button in the
-popover when one is available. Updates are signed: each release ships an Ed25519 signature, and
-the app refuses any download that doesn't match the key built into it. You can also check from
+popover when one is available. Updates are checked twice: each release ships an Ed25519 signature that
+must match the key built into the app, and the new version must be signed by the same Apple
+Developer ID. You can also check from
 **Settings → General → Check for Updates**, or turn automatic checks off.
 
 ## Build from source
@@ -127,13 +126,18 @@ $Q --update                   # download, verify, and install the latest release
 
 ## Releasing (maintainers)
 
+One-time setup: a "Developer ID Application" certificate in your Keychain, notarization
+credentials stored with `xcrun notarytool store-credentials quotacat-notary`, and an update-signing
+key from `swift scripts/sign-update.swift keygen` (kept in `~/.config/quotacat`, never in the repo).
+
+Then, only when you have changes to ship, use a new version number and a real description:
+
 ```bash
-swift scripts/sign-update.swift keygen   # once; the key lives in ~/.config/quotacat, never in the repo
-./scripts/release.sh 1.2.0 "What changed"
+./scripts/release.sh X.Y.Z "Describe what changed"
 ```
 
-`release.sh` bumps `VERSION`, builds the universal app, signs `Quotacat.zip`, tags, pushes, and
-creates the GitHub release.
+`release.sh` bumps `VERSION`, builds the universal app, signs it with your Developer ID, has Apple
+notarize it, signs `Quotacat.zip` for the updater, tags, pushes, and creates the GitHub release.
 
 ## Design
 

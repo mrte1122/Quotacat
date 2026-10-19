@@ -26,12 +26,13 @@ enum ThemeChoice: String, CaseIterable, Identifiable {
 }
 
 enum IconStyle: String, CaseIterable, Identifiable {
-    case progressBar, battery, percentage, textOnly
+    case progressBar, battery, radial, percentage, textOnly
     var id: String { rawValue }
     var title: String {
         switch self {
         case .progressBar: return "Progress Bar"
         case .battery: return "Battery"
+        case .radial: return "Radial"
         case .percentage: return "Percentage"
         case .textOnly: return "Text Only"
         }
@@ -48,6 +49,7 @@ enum SettingsKey {
     static let showCountdown = "showCountdown"
     static let paceColoring = "paceColoring"
     static let showTimeMarker = "showTimeMarker"
+    static let radialMeters = "radialMeters"            // popover: ring gauges instead of bars
     static let notificationsEnabled = "notificationsEnabled"
     static let actionsQuota = "actionsQuota"
     static let copilotQuota = "copilotQuota"
@@ -70,6 +72,7 @@ enum SettingsKey {
             showCountdown: false,
             paceColoring: true,
             showTimeMarker: true,
+            radialMeters: false,
             notificationsEnabled: true,
             actionsQuota: 2000.0,   // GitHub Free; Pro is 3000
             copilotQuota: 300.0,    // Copilot Pro; Free is 50, Pro+ is 1500

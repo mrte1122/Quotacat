@@ -40,8 +40,9 @@ when you're far ahead of your quota.
 
 Also included:
 
-- Four menu-bar styles (progress bar, battery, percentage, text only), monochrome mode, and a
-  "show remaining" option
+- Five menu-bar styles (progress bar, battery, radial, percentage, text only), monochrome mode,
+  and a "show remaining" option
+- Popover meters as horizontal bars or radial rings
 - Notifications at 75%, 90% and 95%, and when a limit resets
 - A refresh interval from 10 seconds to 5 minutes, plus refreshes on wake and when the network returns
 - Daily usage charts for the month

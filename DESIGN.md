@@ -25,7 +25,10 @@ monitor for Claude plan limits. Quotacat shares no code with it. It adopts these
   | ≥ 120% | Runaway | purple |
 
 - **Menu-bar icon styles** (progress bar, battery, percentage, text only), monochrome mode,
-  "show remaining" mode, and short metric labels.
+  "show remaining" mode, and short metric labels. Quotacat adds a **radial** style: a ring gauge
+  per metric, filled clockwise from 12 o'clock, with the time marker as a tick across the ring.
+  The same ring is available for the popover cards (Settings → Appearance → Popover), with the
+  percentage inside the ring.
 - A **refresh interval slider** from 10s to 300s, plus refreshes on wake from sleep and when the
   network returns, both debounced.
 - **Threshold notifications** at 75%, 90% and 95%, deduplicated per window, plus a notice when a
@@ -106,8 +109,8 @@ Sources/Quotacat/
   UsageStore.swift     refresh coordinator: timer, wake/network triggers, cache file, demo data
   Notifier.swift       threshold and reset notifications with per-window dedup
   Theme.swift          status and pace colors
-  MenuBarIcon.swift    NSImage renderer for the four icon styles
-  PopoverView.swift    dashboard cards, banner, breakdowns, daily charts
+  MenuBarIcon.swift    NSImage renderer for the five icon styles
+  PopoverView.swift    dashboard cards (bars or radial meters), banner, breakdowns, daily charts
   SettingsView.swift   General / Appearance / Account / Quotas tabs
   Snapshot.swift       offscreen renders of the popover and icons (README screenshots)
   Updater.swift        release check, signature verification, in-place install and relaunch

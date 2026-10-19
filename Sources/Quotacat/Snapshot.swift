@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// `Quotacat --snapshot <dir>`: fetch once, then render the popover and every menu-bar icon
-/// style to PNGs without touching the real status bar. Used for visual checks.
+/// `Quotacat --snapshot <dir>`: fetch once, then render the popover (bars and radial meters)
+/// and every menu-bar icon style to PNGs without touching the real status bar. Used for visual checks.
 @MainActor
 enum Snapshot {
     static func run(outDir: String) -> Never {
@@ -30,7 +30,13 @@ enum Snapshot {
 
             // Render through a real NSHostingView (not ImageRenderer) so AppKit-backed
             // buttons and links draw instead of placeholder blocks.
-            for (name, appearanceName) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+            let savedRadial = d.object(forKey: SettingsKey.radialMeters)
+            let variants: [(name: String, appearance: NSAppearance.Name, radial: Bool)] = [
+                ("light", .aqua, false), ("dark", .darkAqua, false),
+                ("radial-light", .aqua, true), ("radial-dark", .darkAqua, true),
+            ]
+            for (name, appearanceName, radial) in variants {
+                d.set(radial, forKey: SettingsKey.radialMeters)
                 let view = PopoverView(store: store, updater: Updater(), openSettings: {})
                     .background(Color(nsColor: .windowBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -48,6 +54,7 @@ enum Snapshot {
                         .write(to: dir.appendingPathComponent("popover-\(name).png"))
                 }
             }
+            d.set(savedRadial, forKey: SettingsKey.radialMeters)
             print("Snapshots written to \(dir.path)")
             exit(0)
         }

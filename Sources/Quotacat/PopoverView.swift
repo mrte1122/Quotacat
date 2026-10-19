@@ -8,6 +8,7 @@ struct PopoverView: View {
 
     @AppStorage(SettingsKey.paceColoring) private var paceColoring = true
     @AppStorage(SettingsKey.showTimeMarker) private var showTimeMarker = true
+    @AppStorage(SettingsKey.radialMeters) private var radialMeters = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -122,7 +123,8 @@ struct PopoverView: View {
             Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             ForEach(kinds) { kind in
                 if let m = store.metrics[kind] {
-                    MetricCard(metric: m, now: store.now, paceColoring: paceColoring, showTimeMarker: showTimeMarker)
+                    MetricCard(metric: m, now: store.now, paceColoring: paceColoring,
+                               showTimeMarker: showTimeMarker, radial: radialMeters)
                 } else if let issue = store.issues[kind] {
                     IssueRow(kind: kind, message: issue)
                 } else if store.isRefreshing || store.lastUpdated == nil {
@@ -156,6 +158,7 @@ struct MetricCard: View {
     let now: Date
     let paceColoring: Bool
     let showTimeMarker: Bool
+    var radial = false
     @State private var expanded = false
 
     private var projected: Double? {
@@ -163,35 +166,17 @@ struct MetricCard: View {
                                     start: metric.periodStart, end: metric.resetAt, now: now)
     }
 
+    private var elapsed: Double? {
+        showTimeMarker ? UsageMath.elapsedFraction(start: metric.periodStart, end: metric.resetAt, now: now) : nil
+    }
+
+    private var meterColor: Color { Color(ns: Theme.barColor(for: metric, now: now, paceAware: paceColoring)) }
+    private var percentColor: Color { Color(ns: Theme.status(UsageMath.statusLevel(fraction: metric.fraction))) }
+    private var percentText: String { "\(Int((metric.fraction * 100).rounded()))%" }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline) {
-                Label(metric.kind.title, systemImage: metric.kind.symbol).font(.callout.weight(.medium))
-                Spacer()
-                Text("\(Int((metric.fraction * 100).rounded()))%")
-                    .font(.callout.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(Color(ns: Theme.status(UsageMath.statusLevel(fraction: metric.fraction))))
-            }
-            UsageBar(fraction: metric.fraction,
-                     elapsed: showTimeMarker ? UsageMath.elapsedFraction(start: metric.periodStart, end: metric.resetAt, now: now) : nil,
-                     color: Color(ns: Theme.barColor(for: metric, now: now, paceAware: paceColoring)),
-                     markerColor: .primary)  // the bar and caption already carry the pace color
-            HStack {
-                Text("\(UsageMath.formatQuantity(metric.used)) / \(UsageMath.formatQuantity(metric.limit)) \(metric.kind.unit)")
-                if let amt = metric.netAmount, amt > 0 {
-                    Text(String(format: "· $%.2f billed", amt))
-                }
-                Spacer()
-                Text("Resets in \(UsageMath.countdown(to: metric.resetAt, now: now))")
-                    .help(metric.resetAt.formatted(date: .abbreviated, time: .shortened))
-            }
-            .font(.caption).foregroundStyle(.secondary)
-            if let p = projected {
-                let tier = UsageMath.paceTier(projected: p)
-                Text("\(tier.title) · projected \(Int((p * 100).rounded()))% by reset")
-                    .font(.caption2)
-                    .foregroundStyle(Color(ns: Theme.pace(tier)))
-            }
+            if radial { radialLayout } else { barLayout }
             if !metric.breakdown.isEmpty || metric.daily.count > 1 {
                 DisclosureGroup(isExpanded: $expanded) {
                     details.padding(.top, 4)
@@ -202,6 +187,74 @@ struct MetricCard: View {
         }
         .padding(10)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    /// Default layout: title and percentage on one line, a horizontal bar, then the caption.
+    @ViewBuilder private var barLayout: some View {
+        HStack(alignment: .firstTextBaseline) {
+            title
+            Spacer()
+            Text(percentText)
+                .font(.callout.monospacedDigit().weight(.semibold))
+                .foregroundStyle(percentColor)
+        }
+        UsageBar(fraction: metric.fraction, elapsed: elapsed, color: meterColor,
+                 markerColor: .primary)  // the bar and caption already carry the pace color
+        HStack {
+            quantity
+            Spacer()
+            resets
+        }
+        .font(.caption).foregroundStyle(.secondary)
+        pace
+    }
+
+    /// Radial layout: a ring gauge with the percentage inside, and the text stacked beside it.
+    private var radialLayout: some View {
+        HStack(alignment: .center, spacing: 12) {
+            RadialMeter(fraction: metric.fraction, elapsed: elapsed, color: meterColor, markerColor: .primary) {
+                Text(percentText)
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(percentColor)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+            }
+            .frame(width: 56, height: 56)
+            VStack(alignment: .leading, spacing: 3) {
+                title
+                quantity.font(.caption).foregroundStyle(.secondary)
+                resets.font(.caption).foregroundStyle(.secondary)
+                pace
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var title: some View {
+        Label(metric.kind.title, systemImage: metric.kind.symbol).font(.callout.weight(.medium))
+    }
+
+    private var quantity: some View {
+        HStack(spacing: 4) {
+            Text("\(UsageMath.formatQuantity(metric.used)) / \(UsageMath.formatQuantity(metric.limit)) \(metric.kind.unit)")
+            if let amt = metric.netAmount, amt > 0 {
+                Text(String(format: "· $%.2f billed", amt))
+            }
+        }
+    }
+
+    private var resets: some View {
+        Text("Resets in \(UsageMath.countdown(to: metric.resetAt, now: now))")
+            .help(metric.resetAt.formatted(date: .abbreviated, time: .shortened))
+    }
+
+    @ViewBuilder private var pace: some View {
+        if let p = projected {
+            let tier = UsageMath.paceTier(projected: p)
+            Text("\(tier.title) · projected \(Int((p * 100).rounded()))% by reset")
+                .font(.caption2)
+                .foregroundStyle(Color(ns: Theme.pace(tier)))
+        }
     }
 
     @ViewBuilder private var details: some View {
@@ -246,6 +299,42 @@ struct UsageBar: View {
             }
         }
         .frame(height: 7)
+    }
+}
+
+/// Ring gauge: a faint track, the value as an arc clockwise from 12 o'clock, the time marker as
+/// a tick across the ring, and arbitrary content (usually the percentage) in the middle.
+struct RadialMeter<Center: View>: View {
+    let fraction: Double
+    let elapsed: Double?
+    let color: Color
+    let markerColor: Color
+    var lineWidth: CGFloat = 6
+    @ViewBuilder let center: () -> Center
+
+    var body: some View {
+        GeometryReader { geo in
+            let side = min(geo.size.width, geo.size.height)
+            let radius = (side - lineWidth) / 2   // stroke centerline
+            ZStack {
+                Circle().stroke(.quaternary, lineWidth: lineWidth)
+                Circle()
+                    .trim(from: 0, to: min(1, max(fraction > 0 ? 0.02 : 0, fraction)))
+                    .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                if let e = elapsed {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(markerColor)
+                        .frame(width: 2, height: lineWidth + 4)
+                        .offset(y: -radius)
+                        .rotationEffect(.degrees(360 * e))
+                        .help("\(Int(e * 100))% of the window elapsed")
+                }
+                center()
+            }
+            .frame(width: side - lineWidth, height: side - lineWidth)
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
     }
 }
 

@@ -1,7 +1,8 @@
 import AppKit
 
 /// Draws the status-item image. Mirrors Claude Usage's `MenuBarIconRenderer` styles:
-/// progress bar, battery, percentage, text only; monochrome renders as a template image.
+/// progress bar, battery, percentage, text only, plus a radial ring gauge; monochrome renders
+/// as a template image.
 @MainActor
 enum MenuBarIconRenderer {
     struct Segment {
@@ -15,6 +16,12 @@ enum MenuBarIconRenderer {
     static let height: CGFloat = 18
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
     private static let labelFont = NSFont.systemFont(ofSize: 9, weight: .semibold)
+
+    // Radial style: ring centerline radius and stroke width. The ring plus its time-marker tick
+    // (ringRadius + ringWidth / 2 + tickOverhang = 8.75pt) fits inside the 18pt image height.
+    private static let ringRadius: CGFloat = 6
+    private static let ringWidth: CGFloat = 2.5
+    private static let ringSlot: CGFloat = 15
 
     static func render(store: UsageStore) -> NSImage {
         let d = UserDefaults.standard
@@ -73,6 +80,7 @@ enum MenuBarIconRenderer {
         switch style {
         case .progressBar: w += 30
         case .battery: w += 25
+        case .radial: w += ringSlot
         case .percentage, .textOnly: w += textSize(pct(s.fraction), font).width
         }
         if let c = s.countdown { w += 3 + textSize(c, labelFont).width }
@@ -120,6 +128,9 @@ enum MenuBarIconRenderer {
             NSBezierPath(roundedRect: NSRect(x: inner.minX, y: inner.minY, width: inner.width * s.fraction, height: inner.height),
                          xRadius: 1, yRadius: 1).fill()
             x += 25
+        case .radial:
+            drawRing(s, text: text, center: NSPoint(x: x + ringSlot / 2, y: mid))
+            x += ringSlot
         case .percentage:
             drawText(pct(s.fraction), font, s.color)
         case .textOnly:
@@ -127,5 +138,41 @@ enum MenuBarIconRenderer {
         }
 
         if let c = s.countdown { x += 3; drawText(c, labelFont, text.withAlphaComponent(0.8)) }
+    }
+
+    /// Ring gauge: a faint full-circle track, the value as an arc clockwise from 12 o'clock, and
+    /// the time marker as a short radial tick across the ring. Angles are in AppKit's
+    /// unflipped space, where 90° is 12 o'clock and positive angles run counterclockwise.
+    private static func drawRing(_ s: Segment, text: NSColor, center c: NSPoint) {
+        let r = ringRadius, lw = ringWidth
+        let track = NSBezierPath(ovalIn: NSRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+        track.lineWidth = lw
+        text.withAlphaComponent(0.25).setStroke()
+        track.stroke()
+
+        let f = CGFloat(min(1, max(0, s.fraction)))
+        if f >= 0.999 {
+            s.color.setStroke()
+            track.stroke()
+        } else if f > 0 {
+            let arc = NSBezierPath()
+            // Keep a visible dot for tiny values, like the 3pt minimum on the progress bar.
+            arc.appendArc(withCenter: c, radius: r, startAngle: 90, endAngle: 90 - 360 * max(f, 0.02), clockwise: true)
+            arc.lineWidth = lw
+            arc.lineCapStyle = .round
+            s.color.setStroke()
+            arc.stroke()
+        }
+
+        if let e = s.elapsed {
+            let a = CGFloat(90 - 360 * e) * .pi / 180
+            let inner = r - lw / 2 - 1.5, outer = r + lw / 2 + 1.5
+            let tick = NSBezierPath()
+            tick.move(to: NSPoint(x: c.x + cos(a) * inner, y: c.y + sin(a) * inner))
+            tick.line(to: NSPoint(x: c.x + cos(a) * outer, y: c.y + sin(a) * outer))
+            tick.lineWidth = 1.5
+            text.setStroke()
+            tick.stroke()
+        }
     }
 }

@@ -108,6 +108,7 @@ private struct AppearanceSettings: View {
     @AppStorage(SettingsKey.showCountdown) private var showCountdown = false
     @AppStorage(SettingsKey.paceColoring) private var paceColoring = true
     @AppStorage(SettingsKey.showTimeMarker) private var showTimeMarker = true
+    @AppStorage(SettingsKey.radialMeters) private var radialMeters = false
 
     var body: some View {
         Form {
@@ -131,9 +132,14 @@ private struct AppearanceSettings: View {
                 Toggle("Show remaining instead of used", isOn: $showRemaining)
                 Toggle("Monochrome (adapts to light and dark menu bars)", isOn: $monochrome)
             }
+            Section("Popover") {
+                Toggle("Radial meters instead of bars", isOn: $radialMeters)
+                Text("Draws each quota as a ring with the percentage inside. The time marker becomes a tick on the ring.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Pace") {
-                Toggle("Pace-aware bar colors", isOn: $paceColoring)
-                Toggle("Show time marker on bars", isOn: $showTimeMarker)
+                Toggle("Pace-aware meter colors", isOn: $paceColoring)
+                Toggle("Show time marker on bars and rings", isOn: $showTimeMarker)
                 Text("Pace projects usage to the end of the window: green under 50%, then teal, yellow, orange, red at 100%+, and purple at 120%+.")
                     .font(.caption).foregroundStyle(.secondary)
             }

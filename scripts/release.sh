@@ -22,7 +22,13 @@ echo "$VERSION" > VERSION
 git add VERSION
 git diff --cached --quiet || git commit -q -m "Release v$VERSION"
 
-./scripts/build-app.sh --zip
+# Notarize whenever a Developer ID certificate is available; otherwise ship ad-hoc signed.
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "Developer ID Application"; then
+    ./scripts/build-app.sh --notarize
+else
+    echo "warning: no Developer ID certificate; this release won't be notarized" >&2
+    ./scripts/build-app.sh --zip
+fi
 build/Quotacat.app/Contents/MacOS/Quotacat --selftest >/dev/null || die "self-tests failed"
 swift scripts/sign-update.swift sign build/Quotacat.zip > build/Quotacat.zip.sig
 

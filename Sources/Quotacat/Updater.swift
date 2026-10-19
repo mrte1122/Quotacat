@@ -208,6 +208,29 @@ final class Updater: ObservableObject {
         } catch {
             throw UpdateError.invalidBundle("code signature is broken")
         }
+        // Once this copy is signed with a Developer ID, only accept updates from the same team.
+        // (Ad-hoc builds have no team, so the first move to a Developer ID build is allowed.)
+        if let team = teamIdentifier(of: Bundle.main.bundleURL) {
+            guard teamIdentifier(of: app) == team else {
+                throw UpdateError.invalidBundle("it isn't signed by the same developer")
+            }
+        }
+    }
+
+    /// The signing team from `codesign -dv`, or nil for ad-hoc / unsigned code.
+    nonisolated static func teamIdentifier(of app: URL) -> String? {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        p.arguments = ["-dv", app.path]
+        let pipe = Pipe()
+        p.standardError = pipe          // codesign -dv writes its report to stderr
+        p.standardOutput = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return nil }
+        let out = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        p.waitUntilExit()
+        guard let line = out.split(separator: "\n").first(where: { $0.hasPrefix("TeamIdentifier=") }) else { return nil }
+        let team = String(line.dropFirst("TeamIdentifier=".count))
+        return team == "not set" || team.isEmpty ? nil : team
     }
 
     private static func relaunch(_ app: URL) {

@@ -1,9 +1,28 @@
 #!/bin/bash
 # Builds a universal (Apple silicon + Intel) Quotacat.app into ./build.
-#   --install   also copy it to ~/Applications
-#   --zip       also produce build/Quotacat.zip for a GitHub release
+#   --install    also copy it to ~/Applications
+#   --zip        also produce build/Quotacat.zip for a GitHub release
+#   --notarize   with --zip: submit to Apple's notary service and staple the ticket
+#                (needs a Developer ID certificate and a stored notarytool profile)
+#
+# Signing: uses your "Developer ID Application" certificate when one is in the Keychain
+# (or QUOTACAT_SIGN_IDENTITY), otherwise falls back to ad-hoc signing.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+INSTALL=0; ZIP=0; NOTARIZE=0
+for arg in "$@"; do
+    case "$arg" in
+        --install) INSTALL=1 ;;
+        --zip) ZIP=1 ;;
+        --notarize) NOTARIZE=1; ZIP=1 ;;
+        *) echo "unknown option: $arg" >&2; exit 1 ;;
+    esac
+done
+
+NOTARY_PROFILE="${QUOTACAT_NOTARY_PROFILE:-quotacat-notary}"
+SIGN_IDENTITY="${QUOTACAT_SIGN_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
+    | awk -F'"' '/Developer ID Application/ { print $2; exit }')}"
 
 # The version lives in ./VERSION; QUOTACAT_VERSION overrides it (used to test updates).
 VERSION="${QUOTACAT_VERSION:-$(tr -d '[:space:]' < VERSION)}"
@@ -56,22 +75,37 @@ PLIST
 
 # sips leaves extended attributes that codesign rejects.
 xattr -cr "$APP"
-codesign --force --sign - --timestamp=none "$APP"
-echo "Built $APP ($(lipo -archs "$APP/Contents/MacOS/Quotacat"))"
+if [[ -n "$SIGN_IDENTITY" ]]; then
+    # Hardened runtime + secure timestamp are both required for notarization.
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+    SIGNED_AS="$SIGN_IDENTITY"
+else
+    if [[ $NOTARIZE -eq 1 ]]; then echo "error: --notarize needs a Developer ID Application certificate" >&2; exit 1; fi
+    codesign --force --sign - --timestamp=none "$APP"
+    SIGNED_AS="ad-hoc"
+fi
+codesign --verify --strict "$APP"
+echo "Built $APP ($(lipo -archs "$APP/Contents/MacOS/Quotacat"), signed: $SIGNED_AS)"
 
-for arg in "$@"; do
-    case "$arg" in
-        --install)
-            mkdir -p "$HOME/Applications"
-            rm -rf "$HOME/Applications/Quotacat.app"
-            cp -R "$APP" "$HOME/Applications/"
-            echo "Installed to ~/Applications/Quotacat.app"
-            ;;
-        --zip)
-            # Stable name so releases/latest/download/Quotacat.zip always works.
-            rm -f build/Quotacat.zip
-            ditto -c -k --keepParent "$APP" build/Quotacat.zip
-            echo "Packaged build/Quotacat.zip"
-            ;;
-    esac
-done
+if [[ $ZIP -eq 1 ]]; then
+    # Stable name so releases/latest/download/Quotacat.zip always works.
+    rm -f build/Quotacat.zip
+    ditto -c -k --keepParent "$APP" build/Quotacat.zip
+    if [[ $NOTARIZE -eq 1 ]]; then
+        echo "Submitting to Apple's notary service (usually 1-5 minutes)…"
+        xcrun notarytool submit build/Quotacat.zip --keychain-profile "$NOTARY_PROFILE" --wait
+        # Staple the ticket into the app so it opens offline, then re-zip the stapled copy.
+        xcrun stapler staple "$APP"
+        spctl --assess --type execute "$APP" && echo "Gatekeeper accepts the notarized app"
+        rm -f build/Quotacat.zip
+        ditto -c -k --keepParent "$APP" build/Quotacat.zip
+    fi
+    echo "Packaged build/Quotacat.zip"
+fi
+
+if [[ $INSTALL -eq 1 ]]; then
+    mkdir -p "$HOME/Applications"
+    rm -rf "$HOME/Applications/Quotacat.app"
+    cp -R "$APP" "$HOME/Applications/"
+    echo "Installed to ~/Applications/Quotacat.app"
+fi

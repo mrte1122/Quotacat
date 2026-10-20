@@ -49,6 +49,21 @@ final class Updater: ObservableObject {
     static let zipName = "Quotacat.zip"
     static let releasesPage = URL(string: "https://github.com/\(repository)/releases/latest")!
 
+    /// Why an in-place update can't work from where this copy is running, or nil if it can.
+    /// The common case: the app was opened straight from Downloads, so macOS runs it from a
+    /// read-only "App Translocation" copy that can't be replaced.
+    nonisolated static var installLocationProblem: String? {
+        let url = Bundle.main.bundleURL
+        guard url.pathExtension == "app" else { return "Quotacat isn't running from an app bundle." }
+        if url.path.contains("/AppTranslocation/") {
+            return "macOS is running a temporary, read-only copy of Quotacat because it wasn't moved out of the folder it was downloaded to."
+        }
+        if !FileManager.default.isWritableFile(atPath: url.deletingLastPathComponent().path) {
+            return "Quotacat is in a folder it can't write to."
+        }
+        return nil
+    }
+
     static var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
     }
@@ -152,7 +167,9 @@ final class Updater: ObservableObject {
         defer { try? fm.removeItem(at: work) }
         do {
             let current = Bundle.main.bundleURL
-            guard current.pathExtension == "app" else { throw UpdateError.install("Quotacat isn't running from an app bundle.") }
+            if let problem = Self.installLocationProblem {
+                throw UpdateError.install("\(problem) Move Quotacat to Applications, open it from there, and try again.")
+            }
             try fm.createDirectory(at: work, withIntermediateDirectories: true)
 
             state = .installing("Downloading \(release.version)…")

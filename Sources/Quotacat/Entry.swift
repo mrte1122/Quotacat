@@ -67,6 +67,7 @@ enum Entry {
         let updater = Updater()
         Task { @MainActor in
             print("installed:", Updater.currentVersion, "at", Bundle.main.bundleURL.path)
+            print("install location:", Updater.installLocationProblem ?? "ok, updates can install here")
             await updater.check(userInitiated: true)
             switch updater.state {
             case .available(let release):

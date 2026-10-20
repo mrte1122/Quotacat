@@ -13,6 +13,7 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            locationBanner
             updateBanner
             banner
             section("API rate limits", kinds: MetricKind.rateLimits)
@@ -62,6 +63,29 @@ struct PopoverView: View {
 
     // Mirrors Claude Usage's StatusBannerView: "Refresh failed %d times", credentials problems.
     // Shown only when there's something to act on; "up to date" stays in Settings.
+    /// Updates can't install from a translocated or read-only copy, so say how to fix it up front.
+    @ViewBuilder private var locationBanner: some View {
+        if Updater.installLocationProblem != nil {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Move Quotacat to Applications", systemImage: "folder.badge.plus")
+                    .font(.callout.weight(.medium))
+                Text("It's running from a temporary copy, so updates can't install. Quit Quotacat, drag it from Downloads into Applications, and open it from there.")
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("Open Applications Folder") {
+                        NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
+                    }
+                    Button("Quit Quotacat") { NSApp.terminate(nil) }
+                }
+                .controlSize(.small)
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.yellow.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
     @ViewBuilder private var updateBanner: some View {
         switch updater.state {
         case .available(let release):
@@ -72,9 +96,15 @@ struct PopoverView: View {
                     Link("What's new", destination: release.pageURL).font(.caption)
                 }
                 Spacer()
-                Button("Update") { Task { await updater.install(release) } }
-                    .controlSize(.small)
-                    .buttonStyle(.borderedProminent)
+                if Updater.installLocationProblem == nil {
+                    Button("Update") { Task { await updater.install(release) } }
+                        .controlSize(.small)
+                        .buttonStyle(.borderedProminent)
+                } else {
+                    // Can't update in place from here; offer the manual download instead.
+                    Link("Download", destination: release.pageURL)
+                        .controlSize(.small)
+                }
             }
             .padding(8)
             .background(Color.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))

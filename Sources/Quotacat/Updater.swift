@@ -45,7 +45,7 @@ final class Updater: ObservableObject {
     }
 
     static let repository = "mrte1122/Quotacat"
-    static let publicKey = "h9nYsERlvNoqMNxU/Lrhu4zNZk3VwlaaspJ1akWSR5k="
+    static let publicKey = "vR/vhMwfddTJngU7jVSDY8CVc2UNf7J52z6AqKVHNJg="
     static let zipName = "Quotacat.zip"
     static let releasesPage = URL(string: "https://github.com/\(repository)/releases/latest")!
 

@@ -36,6 +36,7 @@ enum Snapshot {
                 ("light", .aqua, false, "quotas"), ("dark", .darkAqua, false, "quotas"),
                 ("radial-light", .aqua, true, "quotas"), ("radial-dark", .darkAqua, true, "quotas"),
                 ("pulls-light", .aqua, false, "pulls"), ("pulls-dark", .darkAqua, false, "pulls"),
+                ("actions-light", .aqua, false, "actions"), ("actions-dark", .darkAqua, false, "actions"),
             ]
             for (name, appearanceName, radial, tab) in variants {
                 d.set(radial, forKey: SettingsKey.radialMeters)

@@ -64,6 +64,19 @@ against the 30/minute search limit. The lists refresh at most every 2 minutes, o
 manual refresh. Review-request notifications are seeded on the first fetch, so only requests that
 arrive while Quotacat is running notify. Counts are also written to the shell cache file.
 
+## GitHub Actions
+
+- Watched repositories: those the token can see (owner, collaborator, org member) that were pushed
+  in the last 30 days, up to 20, or an explicit list from Settings → Activity. The repository list
+  refreshes every 30 minutes.
+- For each, `GET /repos/{repo}/actions/runs?branch={default}&status=completed&per_page=30`. A
+  workflow is failing when its most recent completed run concluded `failure`, `timed_out` or
+  `startup_failure`; a later success clears it, and cancelled runs don't count.
+- Requests carry `If-None-Match` with the last ETag. A `304 Not Modified` doesn't count against
+  the rate limit (verified), so steady-state polling every 2 minutes is close to free.
+- Notifications fire when a workflow starts failing and when it recovers, seeded silently on the
+  first check. The failing count goes in the shell cache file as `actionsFailing`.
+
 ## Credentials
 
 1. The GitHub CLI login, via `gh auth token`. GUI apps don't inherit your shell `PATH`, so the
@@ -127,6 +140,8 @@ Sources/Quotacat/
   Snapshot.swift       offscreen renders of the popover and icons (README screenshots)
   PullRequests.swift   PR models, GraphQL fetch and decoding
   PullRequestsView.swift  the Pull requests tab
+  Actions.swift        workflow-run models, failing-workflow rule, ETag-caching fetcher
+  ActionsView.swift    the Actions tab
   Updater.swift        release check, signature verification, in-place install and relaunch
 
 scripts/

@@ -52,7 +52,12 @@ enum SettingsKey {
     static let pullRequestsEnabled = "pullRequestsEnabled"
     static let menuBarPullRequests = "menuBarPullRequests"
     static let notifyReviewRequests = "notifyReviewRequests"
-    static let popoverTab = "popoverTab"                  // "quotas" or "pulls"
+    static let popoverTab = "popoverTab"                  // "quotas", "pulls" or "actions"
+    static let actionsEnabled = "actionsEnabled"
+    static let menuBarActions = "menuBarActions"
+    static let notifyActions = "notifyActions"
+    static let actionsRepoMode = "actionsRepoMode"        // "recent" or "selected"
+    static let actionsSelectedRepos = "actionsSelectedRepos"
     static let radialMeters = "radialMeters"            // popover: ring gauges instead of bars
     static let notificationsEnabled = "notificationsEnabled"
     static let actionsQuota = "actionsQuota"
@@ -81,6 +86,11 @@ enum SettingsKey {
             menuBarPullRequests: true,
             notifyReviewRequests: true,
             popoverTab: "quotas",
+            actionsEnabled: true,
+            menuBarActions: true,
+            notifyActions: true,
+            actionsRepoMode: "recent",
+            actionsSelectedRepos: [String](),
             notificationsEnabled: true,
             actionsQuota: 2000.0,   // GitHub Free; Pro is 3000
             copilotQuota: 300.0,    // Copilot Pro; Free is 50, Pro+ is 1500

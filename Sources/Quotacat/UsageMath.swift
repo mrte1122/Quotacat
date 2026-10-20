@@ -147,6 +147,15 @@ enum SelfTest {
         } else {
             check(false, "PR decode")
         }
+        // Latest completed run per workflow decides; older failures and in-progress runs don't count.
+        func run(_ id: Int, _ wf: Int, _ status: String, _ conclusion: String?) -> WorkflowRun {
+            WorkflowRun(id: id, name: "W\(wf)", workflowID: wf, headBranch: "main", status: status, conclusion: conclusion,
+                        htmlURL: URL(string: "https://github.com/a/b/actions/runs/\(id)")!, runNumber: id, event: "push", updatedAt: nil)
+        }
+        let runs = [run(9, 1, "in_progress", nil), run(8, 1, "completed", "success"), run(7, 1, "completed", "failure"),
+                    run(6, 2, "completed", "timed_out"), run(5, 3, "completed", "cancelled"), run(4, 2, "completed", "success")]
+        let failing = ActionsStatus.failing(repo: "a/b", branch: "main", runs: runs)
+        check(failing.map(\.workflowID) == [2], "Actions: only workflows whose latest completed run failed")
         check(Updater.isVersion("1.1.0", newerThan: "1.0.0"), "version minor bump")
         check(Updater.isVersion("1.10.0", newerThan: "1.9.0"), "version numeric not lexical")
         check(Updater.isVersion("2.0", newerThan: "1.9.9"), "version different lengths")

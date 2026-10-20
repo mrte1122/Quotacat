@@ -8,6 +8,7 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             GeneralSettings(store: store, updater: updater).tabItem { Label("General", systemImage: "gearshape") }
+            ActivitySettings(store: store).tabItem { Label("Activity", systemImage: "bell.badge") }
             AppearanceSettings().tabItem { Label("Appearance", systemImage: "menubar.rectangle") }
             AccountSettings(store: store).tabItem { Label("Account", systemImage: "person.crop.circle") }
             QuotaSettings(store: store).tabItem { Label("Quotas", systemImage: "gauge.with.dots.needle.50percent") }
@@ -21,9 +22,6 @@ private struct GeneralSettings: View {
     @ObservedObject var store: UsageStore
     @ObservedObject var updater: Updater
     @AppStorage(SettingsKey.autoUpdateCheck) private var autoUpdate = true
-    @AppStorage(SettingsKey.pullRequestsEnabled) private var pullRequests = true
-    @AppStorage(SettingsKey.menuBarPullRequests) private var menuBarPullRequests = true
-    @AppStorage(SettingsKey.notifyReviewRequests) private var notifyReviewRequests = true
     @AppStorage(SettingsKey.refreshInterval) private var interval = 60.0
     @AppStorage(SettingsKey.notificationsEnabled) private var notifications = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -58,18 +56,6 @@ private struct GeneralSettings: View {
                     Text("\(Int(interval)) seconds")
                 } minimumValueLabel: { Text("10s") } maximumValueLabel: { Text("300s") }
                 Text("\(preset). Rate-limit checks are free; billing data updates a few times a day on GitHub's side.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section("Pull requests") {
-                Toggle("Show pull requests", isOn: $pullRequests)
-                    .onChange(of: pullRequests) { _, on in if on { Task { await store.refresh(notify: false, forcePullRequests: true) } } }
-                Group {
-                    Toggle("Show reviews waiting on me in the menu bar", isOn: $menuBarPullRequests)
-                    Toggle("Notify me about new review requests", isOn: $notifyReviewRequests)
-                        .onChange(of: notifyReviewRequests) { _, on in if on { store.notifier.requestAuthorization() } }
-                }
-                .disabled(!pullRequests)
-                Text("Lists open PRs waiting on your review and your own open PRs. Refreshed every 2 minutes, or when you click refresh.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Notifications") {
@@ -111,6 +97,83 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Pull requests and GitHub Actions: what to show, badge and notify about, and which repos to watch.
+private struct ActivitySettings: View {
+    @ObservedObject var store: UsageStore
+    @AppStorage(SettingsKey.pullRequestsEnabled) private var pullRequests = true
+    @AppStorage(SettingsKey.menuBarPullRequests) private var menuBarPullRequests = true
+    @AppStorage(SettingsKey.notifyReviewRequests) private var notifyReviewRequests = true
+    @AppStorage(SettingsKey.actionsEnabled) private var actions = true
+    @AppStorage(SettingsKey.menuBarActions) private var menuBarActions = true
+    @AppStorage(SettingsKey.notifyActions) private var notifyActions = true
+    @AppStorage(SettingsKey.actionsRepoMode) private var repoMode = "recent"
+    @State private var selected = Set(UserDefaults.standard.stringArray(forKey: SettingsKey.actionsSelectedRepos) ?? [])
+    @State private var filter = ""
+
+    private func refreshSoon() { Task { await store.refreshActivity() } }
+
+    var body: some View {
+        Form {
+            Section("Pull requests") {
+                Toggle("Show pull requests", isOn: $pullRequests)
+                    .onChange(of: pullRequests) { _, on in if on { refreshSoon() } }
+                Group {
+                    Toggle("Show reviews waiting on me in the menu bar", isOn: $menuBarPullRequests)
+                    Toggle("Notify me about new review requests", isOn: $notifyReviewRequests)
+                        .onChange(of: notifyReviewRequests) { _, on in if on { store.notifier.requestAuthorization() } }
+                }
+                .disabled(!pullRequests)
+            }
+            Section("GitHub Actions") {
+                Toggle("Show failing workflows", isOn: $actions)
+                    .onChange(of: actions) { _, on in if on { refreshSoon() } }
+                Group {
+                    Toggle("Show the failure count in the menu bar", isOn: $menuBarActions)
+                    Toggle("Notify me when a workflow fails or recovers", isOn: $notifyActions)
+                        .onChange(of: notifyActions) { _, on in if on { store.notifier.requestAuthorization() } }
+                    Picker("Watch", selection: $repoMode) {
+                        Text("Repositories pushed in the last 30 days").tag("recent")
+                        Text("Repositories I choose").tag("selected")
+                    }
+                    .onChange(of: repoMode) { _, _ in refreshSoon() }
+                    if repoMode == "selected" { repoPicker }
+                }
+                .disabled(!actions)
+                Text("A workflow counts as failing when its latest completed run on the repository's default branch failed. Checked every 2 minutes; unchanged repositories don't use your API limit.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var repoPicker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField("Filter repositories", text: $filter)
+            if store.availableRepos.isEmpty {
+                Text("Loading repositories…").font(.caption).foregroundStyle(.secondary)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(store.availableRepos.filter { filter.isEmpty || $0.localizedCaseInsensitiveContains(filter) }, id: \.self) { repo in
+                            Toggle(repo, isOn: Binding(
+                                get: { selected.contains(repo) },
+                                set: { on in
+                                    if on { selected.insert(repo) } else { selected.remove(repo) }
+                                    UserDefaults.standard.set(Array(selected).sorted(), forKey: SettingsKey.actionsSelectedRepos)
+                                    refreshSoon()
+                                }))
+                            .toggleStyle(.checkbox)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(height: 140)
+                Text("\(selected.count) selected").font(.caption).foregroundStyle(.secondary)
+            }
+        }
     }
 }
 

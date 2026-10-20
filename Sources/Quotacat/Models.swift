@@ -94,4 +94,6 @@ struct UsageCacheFile: Codable {
     /// Open PR counts, when the pull request feature is on.
     struct PullRequestCounts: Codable { let waitingOnYou: Int; let yours: Int }
     var pullRequests: PullRequestCounts? = nil
+    /// Workflows currently failing on watched repos' default branches.
+    var actionsFailing: Int? = nil
 }

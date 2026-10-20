@@ -45,17 +45,33 @@ enum MenuBarIconRenderer {
                 countdown: countdown ? UsageMath.compactCountdown(to: m.resetAt, now: now) : nil)
         }
 
-        // Pull requests waiting on your review, shown after the meters when there are any.
-        let prCount = d.bool(forKey: SettingsKey.pullRequestsEnabled) && d.bool(forKey: SettingsKey.menuBarPullRequests)
-            ? (store.pullRequests?.waitingOnYouTotal ?? 0) : 0
-        let prStale = store.pullRequests?.waitingOnYou.contains { now.timeIntervalSince($0.createdAt) >= 3 * 86_400 } ?? false
-        let prColor: NSColor = mono ? .black : (prStale ? .systemOrange : .labelColor)
-        let prText = "\(prCount)"
-        let prSymbolWidth: CGFloat = 13
-        let prWidth = prCount > 0 ? ceil(prSymbolWidth + 2 + textSize(prText, font).width) : 0
+        // Activity badges after the meters: reviews waiting on you, then failing workflows.
+        struct Badge { let symbol: String; let palette: [NSColor]; let text: String; let color: NSColor; let width: CGFloat }
+        let badgeSymbolWidth: CGFloat = 13
+        var badges: [Badge] = []
+        /// `palette` colors multi-layer symbols (e.g. a white ✕ on a red circle); defaults to the text color.
+        func addBadge(_ symbol: String, _ count: Int, _ color: NSColor, palette: [NSColor]? = nil) {
+            let text = "\(count)"
+            let tint = mono ? NSColor.black : color
+            badges.append(Badge(symbol: symbol, palette: mono ? [tint] : (palette ?? [tint]), text: text, color: tint,
+                                width: ceil(badgeSymbolWidth + 2 + textSize(text, font).width)))
+        }
+        if d.bool(forKey: SettingsKey.pullRequestsEnabled), d.bool(forKey: SettingsKey.menuBarPullRequests),
+           let q = store.pullRequests, q.waitingOnYouTotal > 0 {
+            let stale = q.waitingOnYou.contains { now.timeIntervalSince($0.createdAt) >= 3 * 86_400 }
+            addBadge("arrow.triangle.pull", q.waitingOnYouTotal, stale ? .systemOrange : .labelColor)
+        }
+        if d.bool(forKey: SettingsKey.actionsEnabled), d.bool(forKey: SettingsKey.menuBarActions),
+           let a = store.actions, !a.failing.isEmpty {
+            if mono {
+                addBadge("xmark.circle", a.failing.count, .systemRed)
+            } else {
+                addBadge("xmark.circle.fill", a.failing.count, .systemRed, palette: [.white, .systemRed])
+            }
+        }
 
         // "App logo mode" when nothing is selected or nothing has loaded yet.
-        guard !segments.isEmpty || prCount > 0 else {
+        guard !segments.isEmpty || !badges.isEmpty else {
             let name = store.lastError != nil && !store.hasData ? "exclamationmark.triangle" : "chart.bar.xaxis"
             let img = NSImage(systemSymbolName: name, accessibilityDescription: "Quotacat")!
             img.isTemplate = true
@@ -64,27 +80,27 @@ enum MenuBarIconRenderer {
 
         let widths = segments.map { width(of: $0, style: style) }
         let gap: CGFloat = 8
-        var total = widths.reduce(0, +) + gap * CGFloat(max(0, segments.count - 1))
-        if prCount > 0 { total += (segments.isEmpty ? 0 : gap) + prWidth }
+        let items = widths + badges.map(\.width)
+        let total = items.reduce(0, +) + gap * CGFloat(max(0, items.count - 1))
         let image = NSImage(size: NSSize(width: ceil(total), height: height), flipped: false) { _ in
             var x: CGFloat = 0
             for (seg, w) in zip(segments, widths) {
                 draw(seg, style: style, mono: mono, at: x)
                 x += w + gap
             }
-            if prCount > 0 {
-                if segments.isEmpty { x = 0 }
+            for badge in badges {
                 let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
-                    .applying(.init(paletteColors: [prColor]))
-                if let symbol = NSImage(systemSymbolName: "arrow.triangle.pull", accessibilityDescription: "Pull requests")?
+                    .applying(.init(paletteColors: badge.palette))
+                if let symbol = NSImage(systemSymbolName: badge.symbol, accessibilityDescription: nil)?
                     .withSymbolConfiguration(config) {
                     let s = symbol.size
-                    symbol.draw(in: NSRect(x: x + (prSymbolWidth - s.width) / 2, y: (height - s.height) / 2,
+                    symbol.draw(in: NSRect(x: x + (badgeSymbolWidth - s.width) / 2, y: (height - s.height) / 2,
                                            width: s.width, height: s.height))
                 }
-                let size = textSize(prText, font)
-                (prText as NSString).draw(at: NSPoint(x: x + prSymbolWidth + 2, y: height / 2 - size.height / 2),
-                                          withAttributes: [.font: font, .foregroundColor: prColor])
+                let size = textSize(badge.text, font)
+                (badge.text as NSString).draw(at: NSPoint(x: x + badgeSymbolWidth + 2, y: height / 2 - size.height / 2),
+                                              withAttributes: [.font: font, .foregroundColor: badge.color])
+                x += badge.width + gap
             }
             return true
         }

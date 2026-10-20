@@ -65,6 +65,24 @@ final class Notifier {
         }
     }
 
+    /// Failing workflows from the previous check; nil until the first check (seeded silently).
+    private var knownFailing: [String: FailingWorkflow]?
+
+    func evaluateActions(_ status: ActionsStatus) {
+        let current = Dictionary(status.failing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        defer { knownFailing = current }
+        guard let known = knownFailing,
+              UserDefaults.standard.bool(forKey: SettingsKey.notifyActions) else { return }
+        let watched = Set(status.watchedRepos)
+        for f in status.failing where known[f.id] == nil {
+            post(title: "CI failing: \(f.repo)", body: "\(f.workflowName) failed on \(f.branch).")
+        }
+        // Only call it a recovery if the repo is still watched (not just removed from the list).
+        for (id, f) in known where current[id] == nil && watched.contains(f.repo) {
+            post(title: "CI passing again: \(f.repo)", body: "\(f.workflowName) is green on \(f.branch).")
+        }
+    }
+
     func post(title: String, body: String) {
         guard available else { return }
         let content = UNMutableNotificationContent()

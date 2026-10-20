@@ -12,12 +12,24 @@ struct PopoverView: View {
     @AppStorage(SettingsKey.pullRequestsEnabled) private var pullRequestsEnabled = true
     @AppStorage(SettingsKey.popoverTab) private var tab = "quotas"
 
-    private var showingPullRequests: Bool { pullRequestsEnabled && tab == "pulls" }
+    @AppStorage(SettingsKey.actionsEnabled) private var actionsEnabled = true
 
-    private var pullRequestsTabTitle: String {
-        guard let n = store.pullRequests?.waitingOnYouTotal, n > 0 else { return "Pull requests" }
-        return "Pull requests (\(n))"
+    /// Tabs for the features that are switched on; Quotas is always there.
+    private var tabs: [(tag: String, title: String)] {
+        var t: [(String, String)] = [("quotas", "Quotas")]
+        if pullRequestsEnabled {
+            let n = store.pullRequests?.waitingOnYouTotal ?? 0
+            t.append(("pulls", n > 0 ? "Pull requests (\(n))" : "Pull requests"))
+        }
+        if actionsEnabled {
+            let n = store.actions?.failing.count ?? 0
+            t.append(("actions", n > 0 ? "Actions (\(n))" : "Actions"))
+        }
+        return t
     }
+
+    /// Falls back to Quotas if the remembered tab's feature was switched off.
+    private var currentTab: String { tabs.contains { $0.tag == tab } ? tab : "quotas" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -25,17 +37,19 @@ struct PopoverView: View {
             locationBanner
             updateBanner
             banner
-            if pullRequestsEnabled {
+            if tabs.count > 1 {
                 Picker("View", selection: $tab) {
-                    Text("Quotas").tag("quotas")
-                    Text(pullRequestsTabTitle).tag("pulls")
+                    ForEach(tabs, id: \.tag) { Text($0.title).tag($0.tag) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
             }
-            if showingPullRequests {
+            switch currentTab {
+            case "pulls":
                 PullRequestsView(queue: store.pullRequests, issue: store.pullRequestIssue, now: store.now)
-            } else {
+            case "actions":
+                ActionsView(status: store.actions, issue: store.actionsIssue, now: store.now, openSettings: openSettings)
+            default:
                 section("API rate limits", kinds: MetricKind.rateLimits)
                 section("This month", kinds: MetricKind.billing)
             }
@@ -55,7 +69,7 @@ struct PopoverView: View {
             }
             Spacer()
             Button {
-                Task { await store.refresh(forcePullRequests: true) }
+                Task { await store.refresh(forceActivity: true) }
             } label: {
                 if store.isRefreshing {
                     ProgressView().controlSize(.small)

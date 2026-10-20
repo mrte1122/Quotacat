@@ -19,6 +19,15 @@ final class UsageStore: ObservableObject {
     @Published private(set) var pullRequests: PullRequestQueue?
     @Published private(set) var pullRequestIssue: String?
     private var lastPullRequestFetch = Date.distantPast
+    @Published private(set) var actions: ActionsStatus?
+    @Published private(set) var actionsIssue: String?
+    /// Every non-archived repository the token can see, for the Settings picker.
+    @Published private(set) var availableRepos: [String] = []
+    private let actionsFetcher = ActionsFetcher()
+    private var repoCache: [RepoSummary] = []
+    private var lastRepoFetch = Date.distantPast
+    private var lastActionsFetch = Date.distantPast
+    static let recentRepoLimit = 20
     /// PR lists change slowly; don't spend API calls on them every 10 seconds.
     private static let pullRequestInterval: TimeInterval = 120
 
@@ -83,7 +92,7 @@ final class UsageStore: ObservableObject {
         Task { await refresh() }
     }
 
-    func refresh(notify: Bool = true, forcePullRequests: Bool = false) async {
+    func refresh(notify: Bool = true, forceActivity: Bool = false) async {
         guard !isRefreshing else { return }
         isRefreshing = true
         lastRefreshStart = Date()
@@ -127,7 +136,7 @@ final class UsageStore: ObservableObject {
             }
 
             if UserDefaults.standard.bool(forKey: SettingsKey.pullRequestsEnabled),
-               forcePullRequests || Date().timeIntervalSince(lastPullRequestFetch) >= Self.pullRequestInterval {
+               forceActivity || Date().timeIntervalSince(lastPullRequestFetch) >= Self.pullRequestInterval {
                 do {
                     let queue = try await client.fetchPullRequests(login: user.login)
                     pullRequests = queue
@@ -137,6 +146,19 @@ final class UsageStore: ObservableObject {
                 } catch {
                     // A PR failure shouldn't hide the quota data that did load.
                     pullRequestIssue = error.localizedDescription
+                }
+            }
+
+            if UserDefaults.standard.bool(forKey: SettingsKey.actionsEnabled),
+               forceActivity || Date().timeIntervalSince(lastActionsFetch) >= Self.pullRequestInterval {
+                do {
+                    let status = try await loadActions(token: credential.token)
+                    actions = status
+                    actionsIssue = nil
+                    lastActionsFetch = Date()
+                    if notify { notifier.evaluateActions(status) }
+                } catch {
+                    actionsIssue = error.localizedDescription
                 }
             }
 
@@ -235,6 +257,46 @@ final class UsageStore: ObservableObject {
         return totals.map { DailyPoint(date: $0.key, quantity: $0.value) }.sorted { $0.date < $1.date }
     }
 
+    /// Re-check PRs and Actions now, e.g. after the watched repositories change in Settings.
+    func refreshActivity() async {
+        lastRepoFetch = .distantPast
+        await refresh(notify: false, forceActivity: true)
+    }
+
+    private func loadActions(token: String) async throws -> ActionsStatus {
+        if repoCache.isEmpty || Date().timeIntervalSince(lastRepoFetch) > 1800 {
+            repoCache = try await actionsFetcher.repositories(token: token)
+            lastRepoFetch = Date()
+            availableRepos = repoCache.filter { !$0.archived }.map(\.fullName).sorted { $0.lowercased() < $1.lowercased() }
+        }
+        let watched = Self.watchedRepos(from: repoCache, now: Date())
+        let fetcher = actionsFetcher
+        let failing = await withTaskGroup(of: [FailingWorkflow].self) { group in
+            for repo in watched {
+                // One repo failing to load (Actions disabled, no access) shouldn't hide the others.
+                group.addTask { (try? await fetcher.failingWorkflows(repo: repo, token: token)) ?? [] }
+            }
+            var all: [FailingWorkflow] = []
+            for await part in group { all += part }
+            return all
+        }
+        return ActionsStatus(failing: failing.sorted { ($0.failedAt ?? .distantPast) > ($1.failedAt ?? .distantPast) },
+                             watchedRepos: watched.map(\.fullName), checkedAt: Date())
+    }
+
+    /// "Recent": repos pushed in the last 30 days (most recent first, capped). "Selected": the user's picks.
+    static func watchedRepos(from repos: [RepoSummary], now: Date) -> [RepoSummary] {
+        let d = UserDefaults.standard
+        let live = repos.filter { !$0.archived }
+        if d.string(forKey: SettingsKey.actionsRepoMode) == "selected" {
+            let picked = Set(d.stringArray(forKey: SettingsKey.actionsSelectedRepos) ?? [])
+            return live.filter { picked.contains($0.fullName) }
+        }
+        let iso = ISO8601DateFormatter()
+        let cutoff = now.addingTimeInterval(-30 * 86_400)
+        return Array(live.filter { ($0.pushedAt.flatMap(iso.date(from:)) ?? .distantPast) >= cutoff }.prefix(recentRepoLimit))
+    }
+
     /// Sample data for README screenshots (`--snapshot DIR --demo`), so no real account data is published.
     func loadDemo() {
         let now = Date()
@@ -278,6 +340,16 @@ final class UsageStore: ObservableObject {
                     pr(51, "Speed up cold start by 40%", "acme/cli-tool", "you", 26, .approved),
                     pr(220, "Experiment: radial gauges", "you/playground", "you", 2, draft: true)],
             yoursTotal: 3)
+        func failure(_ repo: String, _ name: String, _ conclusion: String, _ hoursAgo: Double, run: Int) -> FailingWorkflow {
+            FailingWorkflow(repo: repo, workflowID: run, workflowName: name, branch: "main", conclusion: conclusion,
+                            runURL: URL(string: "https://github.com/\(repo)/actions/runs/\(run)")!, runNumber: run,
+                            failedAt: now.addingTimeInterval(-hoursAgo * 3600))
+        }
+        actions = ActionsStatus(
+            failing: [failure("acme/web-app", "Deploy preview", "failure", 0.6, run: 381),
+                      failure("acme/cli-tool", "Nightly integration tests", "timed_out", 9, run: 117)],
+            watchedRepos: ["acme/web-app", "acme/cli-tool", "acme/docs", "you/playground", "you/dotfiles", "you/blog"],
+            checkedAt: now)
     }
 
     static var cacheURL: URL {
@@ -293,7 +365,8 @@ final class UsageStore: ObservableObject {
                 metrics[k].map { .init(kind: k.rawValue, used: $0.used, limit: $0.limit,
                                        percent: Int(($0.fraction * 100).rounded()), resetAt: $0.resetAt) }
             },
-            pullRequests: pullRequests.map { .init(waitingOnYou: $0.waitingOnYouTotal, yours: $0.yoursTotal) })
+            pullRequests: pullRequests.map { .init(waitingOnYou: $0.waitingOnYouTotal, yours: $0.yoursTotal) },
+            actionsFailing: actions?.failing.count)
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]

@@ -65,6 +65,25 @@ struct DailyPoint: Identifiable, Hashable {
     let quantity: Double
 }
 
+/// Spending allowed after the plan's included Actions minutes run out.
+struct ActionsBudget: Hashable {
+    let amount: Double
+    let spent: Double
+    /// GitHub blocks Actions once the budget is reached.
+    let stopsUsage: Bool
+    /// End-of-period spend at the recent (7-day) daily rate; nil without recent overage.
+    let projectedSpend: Double?
+    /// When the budget runs out at that rate, if before the reset.
+    let runsOutAt: Date?
+    /// Minutes the remaining budget buys on each runner type used this period, e.g. ("macOS", 270).
+    let runway: [Runway]
+
+    struct Runway: Hashable { let runner: String; let minutes: Double }
+
+    var remaining: Double { max(0, amount - spent) }
+    var fraction: Double { UsageMath.fraction(used: spent, limit: amount) }
+}
+
 struct UsageMetric: Identifiable {
     let kind: MetricKind
     var id: MetricKind { kind }
@@ -81,8 +100,16 @@ struct UsageMetric: Identifiable {
     var isCurrency = false
     /// One-line explanation under the card, e.g. how Actions minutes are weighted.
     var note: String? = nil
+    /// Actions only: the overage budget, when one is configured.
+    var budget: ActionsBudget? = nil
 
     var fraction: Double { UsageMath.fraction(used: used, limit: limit) }
+
+    /// Included allowance used up and now spending from the budget.
+    var inBudgetStage: Bool { budget != nil && limit > 0 && used >= limit * 0.999 }
+
+    /// What the headline percentage, menu bar and alerts track: the budget once it's in play.
+    var displayFraction: Double { inBudgetStage ? budget!.fraction : fraction }
     var displayTitle: String { title ?? kind.title }
 
     func format(_ value: Double) -> String {
@@ -112,4 +139,7 @@ struct UsageCacheFile: Codable {
     var pullRequests: PullRequestCounts? = nil
     /// Workflows currently failing on watched repos' default branches.
     var actionsFailing: Int? = nil
+    /// Actions overage budget, when configured.
+    struct Budget: Codable { let amount: Double; let spent: Double; let stopsUsage: Bool }
+    var actionsBudget: Budget? = nil
 }

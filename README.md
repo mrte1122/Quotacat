@@ -110,6 +110,12 @@ runners use about 10× and Windows 2×, and public repositories are free. With t
 Quotacat reads your plan and uses its included minutes automatically. Set your Copilot plan
 (Pro includes $10 of AI Credits, Pro+ $39) in **Settings → Quotas**.
 
+**Got an Actions budget?** Enter it in **Settings → Quotas** (GitHub doesn't share personal
+budgets through its API). Once your included minutes run out, the Actions card switches to the
+budget: how much is spent, how many more minutes it buys on each runner type, where you'll land
+by the end of the month at your recent rate, and, if your budget blocks usage, when Actions
+would stop.
+
 ## Privacy
 
 - Your token is only sent to `api.github.com`.

@@ -36,7 +36,7 @@ enum MenuBarIconRenderer {
 
         let segments: [Segment] = MetricKind.allCases.compactMap { kind in
             guard d.bool(forKey: SettingsKey.menuBar(kind)), let m = store.metrics[kind] else { return nil }
-            let used = min(1, m.fraction)
+            let used = min(1, m.displayFraction)
             return Segment(
                 label: labels ? kind.shortLabel : "",
                 fraction: remaining ? 1 - used : used,

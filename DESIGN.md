@@ -59,6 +59,12 @@ monitor for Claude plan limits. Quotacat shares no code with it. It adopts these
   Linux-equivalent minutes (`grossAmount` / Linux price).
 - **Included minutes** come from the plan (`GET /user` → `plan.name`, visible with the `user`
   scope): Free 2,000, Pro 3,000, Team 3,000, Enterprise 50,000. Can be overridden in Settings.
+- **Actions budget** (entered in Settings; personal budgets aren't in the REST API, only
+  organization ones): spent = sum of `netAmount` for the Actions product (minutes and storage).
+  Runway = remaining dollars / each runner type's per-minute price seen this period. Projection =
+  spent + (net spend over the last 7 days / 7) × days left; if that crosses the budget before the
+  reset, the card shows the approximate run-out date. Once included minutes are used up, the
+  headline percentage, menu-bar meter, colors and alerts follow the budget.
 - **Copilot** moved to usage-based billing on June 1, 2026: AI Credits, metered in dollars by
   tokens per model (Pro includes $10/month, Pro+ $39). Quotacat sums `grossAmount` from the AI
   credit endpoint, broken down by model. Annual plans keep premium requests until renewal, so if

@@ -236,8 +236,8 @@ struct MetricCard: View {
     }
 
     private var meterColor: Color { Color(ns: Theme.barColor(for: metric, now: now, paceAware: paceColoring)) }
-    private var percentColor: Color { Color(ns: Theme.status(UsageMath.statusLevel(fraction: metric.fraction))) }
-    private var percentText: String { "\(Int((metric.fraction * 100).rounded()))%" }
+    private var percentColor: Color { Color(ns: Theme.status(UsageMath.statusLevel(fraction: metric.displayFraction))) }
+    private var percentText: String { "\(Int((metric.displayFraction * 100).rounded()))%" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -259,12 +259,18 @@ struct MetricCard: View {
         HStack(alignment: .firstTextBaseline) {
             title
             Spacer()
-            Text(percentText)
+            Text(metric.inBudgetStage ? "Budget \(percentText)" : percentText)
                 .font(.callout.monospacedDigit().weight(.semibold))
                 .foregroundStyle(percentColor)
         }
-        UsageBar(fraction: metric.fraction, elapsed: elapsed, color: meterColor,
-                 markerColor: .primary)  // the bar and caption already carry the pace color
+        if let budget = metric.budget {
+            TwoStageBar(included: metric.fraction, budget: metric.inBudgetStage ? budget.fraction : 0,
+                        includedColor: metric.inBudgetStage ? Color.secondary.opacity(0.45) : meterColor,
+                        budgetColor: meterColor)
+        } else {
+            UsageBar(fraction: metric.fraction, elapsed: elapsed, color: meterColor,
+                     markerColor: .primary)  // the bar and caption already carry the pace color
+        }
         HStack {
             quantity
             Spacer()
@@ -272,6 +278,7 @@ struct MetricCard: View {
         }
         .font(.caption).foregroundStyle(.secondary)
         pace
+        budgetLines
         noteText
     }
 
@@ -284,7 +291,7 @@ struct MetricCard: View {
     /// Radial layout: a ring gauge with the percentage inside, and the text stacked beside it.
     private var radialLayout: some View {
         HStack(alignment: .center, spacing: 12) {
-            RadialMeter(fraction: metric.fraction, elapsed: elapsed, color: meterColor, markerColor: .primary) {
+            RadialMeter(fraction: metric.displayFraction, elapsed: elapsed, color: meterColor, markerColor: .primary) {
                 Text(percentText)
                     .font(.system(size: 12, weight: .semibold).monospacedDigit())
                     .foregroundStyle(percentColor)
@@ -297,6 +304,7 @@ struct MetricCard: View {
                 quantity.font(.caption).foregroundStyle(.secondary)
                 resets.font(.caption).foregroundStyle(.secondary)
                 pace
+                budgetLines
                 noteText
             }
             Spacer(minLength: 0)
@@ -310,7 +318,9 @@ struct MetricCard: View {
     private var quantity: some View {
         HStack(spacing: 4) {
             Text(metric.amountText)
-            if let amt = metric.netAmount, amt > 0 {
+            if let b = metric.budget {
+                Text("· \(money(b.spent)) of \(money(b.amount)) budget")
+            } else if let amt = metric.netAmount, amt > 0 {
                 Text(String(format: "· $%.2f billed", amt))
             }
         }
@@ -321,8 +331,46 @@ struct MetricCard: View {
             .help(metric.resetAt.formatted(date: .abbreviated, time: .shortened))
     }
 
+    private func money(_ v: Double) -> String { String(format: "$%.2f", v) }
+
+    /// Budget runway and projection (Actions with a budget configured).
+    @ViewBuilder private var budgetLines: some View {
+        if let b = metric.budget {
+            if !metric.inBudgetStage {
+                Text("Then a \(money(b.amount)) budget\(b.stopsUsage ? "; Actions stops when it runs out" : "")")
+                    .font(.caption2).foregroundStyle(.secondary)
+            } else if b.remaining <= 0 {
+                Text(b.stopsUsage ? "Budget used up: GitHub has paused Actions until \(metric.resetAt.formatted(.dateTime.month(.abbreviated).day()))"
+                                  : "Budget used up: further usage is billed")
+                    .font(.caption2.weight(.semibold)).foregroundStyle(.red)
+            } else {
+                if !b.runway.isEmpty {
+                    Text("≈ " + b.runway.map { "\(Int($0.minutes).formatted()) \($0.runner)" }.joined(separator: " or ") + " min left")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                if let p = b.projectedSpend {
+                    let tier = UsageMath.paceTier(projected: p / b.amount)
+                    Text(projectionText(b, projected: p))
+                        .font(.caption2)
+                        .foregroundStyle(Color(ns: Theme.pace(tier)))
+                }
+            }
+        }
+    }
+
+    private func projectionText(_ b: ActionsBudget, projected: Double) -> String {
+        if let at = b.runsOutAt {
+            let day = at.formatted(.dateTime.month(.abbreviated).day())
+            return b.stopsUsage ? "At this rate the budget runs out around \(day); Actions will stop"
+                                : "At this rate the budget runs out around \(day)"
+        }
+        return "Projected \(money(projected)) of \(money(b.amount)) by reset"
+    }
+
     @ViewBuilder private var pace: some View {
-        if let p = projected {
+        if metric.inBudgetStage {
+            EmptyView()   // the budget projection replaces the included-minutes pace
+        } else if let p = projected {
             let tier = UsageMath.paceTier(projected: p)
             Text("\(tier.title) · projected \(Int((p * 100).rounded()))% by reset")
                 .font(.caption2)
@@ -348,6 +396,35 @@ struct MetricCard: View {
             }
             .font(.caption)
         }
+    }
+}
+
+/// Included allowance, then the overage budget, as two zones of one bar.
+struct TwoStageBar: View {
+    let included: Double
+    let budget: Double
+    let includedColor: Color
+    let budgetColor: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            let gap: CGFloat = 3
+            let first = (geo.size.width - gap) * 0.6
+            let second = geo.size.width - gap - first
+            HStack(spacing: gap) {
+                zone(width: first, fraction: included, color: includedColor).help("Included minutes")
+                zone(width: second, fraction: budget, color: budgetColor).help("Budget")
+            }
+        }
+        .frame(height: 7)
+    }
+
+    private func zone(width: CGFloat, fraction: Double, color: Color) -> some View {
+        ZStack(alignment: .leading) {
+            Capsule().fill(.quaternary)
+            Capsule().fill(color).frame(width: fraction > 0 ? max(6, width * min(1, fraction)) : 0)
+        }
+        .frame(width: width)
     }
 }
 

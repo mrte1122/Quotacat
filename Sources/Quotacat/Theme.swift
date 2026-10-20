@@ -24,6 +24,11 @@ enum Theme {
 
     /// Bar color: pace-aware when enabled and enough of the window has elapsed, else usage level.
     static func barColor(for m: UsageMetric, now: Date, paceAware: Bool) -> NSColor {
+        // Past the included allowance, color by the budget: projected spend vs. the budget amount.
+        if m.inBudgetStage, let b = m.budget {
+            if paceAware, let p = b.projectedSpend, b.amount > 0 { return pace(UsageMath.paceTier(projected: p / b.amount)) }
+            return status(UsageMath.statusLevel(fraction: b.fraction))
+        }
         if paceAware, let p = UsageMath.projectedFraction(used: m.used, limit: m.limit,
                                                          start: m.periodStart, end: m.resetAt, now: now) {
             return pace(UsageMath.paceTier(projected: p))

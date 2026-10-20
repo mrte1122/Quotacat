@@ -169,6 +169,20 @@ enum SelfTest {
         check(abs((am.netAmount ?? 0) - 3.224) < 0.001, "Actions: overage billed amount")
         check(!am.breakdown.contains { $0.label == "Quotacat" }, "Actions: public repos excluded")
         check(am.note != nil, "Actions: weighting note shown when non-Linux runners used")
+        // Budget: $3.22 of $20 spent, all in the last 7 days; runway on the runner types used.
+        let now = ISO8601DateFormatter().date(from: "2026-10-09T00:00:00Z")!
+        let end = ISO8601DateFormatter().date(from: "2026-11-01T00:00:00Z")!
+        let ab = UsageStore.actionsBudget(rows: rows, amount: 20, stopsUsage: true, now: now, end: end)
+        check(abs(ab.spent - 3.224) < 0.001 && abs(ab.remaining - 16.776) < 0.001, "Budget: spent and remaining")
+        check(ab.runway.first?.runner == "macOS" && Int(ab.runway.first!.minutes) == 270, "Budget: macOS runway (~270 min)")
+        check(ab.runway.contains { $0.runner == "Linux" && Int($0.minutes) == 2796 }, "Budget: Linux runway (~2,796 min)")
+        // 3.224/7 per day for 23 days ≈ $10.59 more → projected ≈ $13.82, under budget, so no run-out date.
+        check(abs((ab.projectedSpend ?? 0) - 13.82) < 0.05 && ab.runsOutAt == nil, "Budget: projection under budget")
+        let tight = UsageStore.actionsBudget(rows: rows, amount: 5, stopsUsage: true, now: now, end: end)
+        check(tight.runsOutAt != nil && tight.runsOutAt! > now && tight.runsOutAt! < end, "Budget: run-out date when it won't last")
+        var staged = am
+        staged.budget = ab
+        check(staged.inBudgetStage && abs(staged.displayFraction - 0.1612) < 0.001, "Budget: headline switches to budget %")
         let credit = PremiumItem(model: "Claude Sonnet", sku: "copilot_ai_credit", grossQuantity: 712, grossAmount: 7.12, netAmount: 0)
         let cm = UsageStore.copilotMetric(credits: [credit], premium: [], usageRows: [], includedCredits: 10, includedRequests: 300, start: t0, end: t1)
         check(cm.isCurrency && cm.amountText == "$7.12 / $10.00", "Copilot: AI Credits in dollars")

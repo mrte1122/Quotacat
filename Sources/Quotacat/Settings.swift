@@ -63,6 +63,8 @@ enum SettingsKey {
     static let actionsQuota = "actionsQuota"
     static let actionsQuotaFromPlan = "actionsQuotaFromPlan"   // use the GitHub plan's included minutes
     static let copilotCredits = "copilotCredits"               // included AI Credits, in dollars
+    static let actionsBudget = "actionsBudget"                 // $ allowed beyond included minutes; 0 = none
+    static let actionsBudgetStops = "actionsBudgetStops"       // GitHub blocks Actions at the budget
     static let copilotQuota = "copilotQuota"
     static let preferPAT = "preferPAT"
     static let sentNotifications = "sentNotifications"
@@ -96,7 +98,9 @@ enum SettingsKey {
             notificationsEnabled: true,
             actionsQuota: 2000.0,
             actionsQuotaFromPlan: true,
-            copilotCredits: 10.0,     // Copilot Pro; Pro+ includes $39   // GitHub Free; Pro is 3000
+            copilotCredits: 10.0,     // Copilot Pro; Pro+ includes $39
+            actionsBudget: 0.0,
+            actionsBudgetStops: false,   // GitHub Free; Pro is 3000
             copilotQuota: 300.0,    // Copilot Pro; Free is 50, Pro+ is 1500
             preferPAT: false,
             autoUpdateCheck: true,

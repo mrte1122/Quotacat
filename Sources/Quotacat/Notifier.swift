@@ -30,6 +30,28 @@ final class Notifier {
 
         for m in metrics where Self.watched.contains(m.kind) && m.limit > 0 {
             let window = Int(m.resetAt.timeIntervalSince1970 / 60)
+            if m.inBudgetStage, let b = m.budget {
+                // Once, when the included minutes run out and the budget starts paying.
+                let exhausted = "actions-\(window)-included-exhausted"
+                if !sent.contains(exhausted) {
+                    sent.insert(exhausted)
+                    post(title: "Included Actions minutes used up",
+                         body: String(format: "Now spending from your $%.2f budget.", b.amount)
+                             + (b.stopsUsage ? " GitHub stops Actions when it runs out." : ""))
+                }
+                if let t = Self.thresholds.last(where: { b.fraction >= $0 }) {
+                    let key = "actions-budget-\(window)-\(Int(t * 100))"
+                    if !sent.contains(key) {
+                        for lower in Self.thresholds where lower <= t { sent.insert("actions-budget-\(window)-\(Int(lower * 100))") }
+                        let spent = String(format: "$%.2f of $%.2f spent.", b.spent, b.amount)
+                        post(title: "Actions budget at \(Int((b.fraction * 100).rounded()))%",
+                             body: spent + (b.stopsUsage ? " Actions stops at the limit." : ""))
+                    }
+                }
+                lastReset[m.kind] = m.resetAt
+                lastFraction[m.kind] = m.fraction
+                continue
+            }
             // Only the highest crossed threshold fires, so a jump from 10% to 96% sends one alert.
             if let t = Self.thresholds.last(where: { m.fraction >= $0 }) {
                 let key = "\(m.kind.rawValue)-\(window)-\(Int(t * 100))"

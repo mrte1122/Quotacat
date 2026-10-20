@@ -300,6 +300,8 @@ private struct QuotaSettings: View {
     @AppStorage(SettingsKey.actionsQuotaFromPlan) private var fromPlan = true
     @AppStorage(SettingsKey.actionsQuota) private var actions = 2000.0
     @AppStorage(SettingsKey.copilotCredits) private var credits = 10.0
+    @AppStorage(SettingsKey.actionsBudget) private var budget = 0.0
+    @AppStorage(SettingsKey.actionsBudgetStops) private var budgetStops = false
     @AppStorage(SettingsKey.copilotQuota) private var requests = 300.0
 
     private var planMinutes: Double? { store.plan.flatMap { UsageStore.planActionsMinutes[$0] } }
@@ -318,6 +320,20 @@ private struct QuotaSettings: View {
                     .onSubmit(apply)
                 Text("Counted the way GitHub does: in standard Linux minutes, where macOS runners use about 10× and Windows 2×, and public repositories are free.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Actions budget") {
+                TextField("Monthly budget beyond included minutes ($, 0 for none)", value: $budget,
+                          format: .number.precision(.fractionLength(2)))
+                    .onSubmit(apply)
+                Toggle("GitHub stops Actions when the budget runs out", isOn: $budgetStops)
+                    .disabled(budget <= 0)
+                    .onChange(of: budgetStops) { _, _ in apply() }
+                HStack {
+                    Text("GitHub doesn't share personal budgets through its API, so enter yours here.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Link("View budgets", destination: URL(string: "https://github.com/settings/billing/budgets")!).font(.caption)
+                }
             }
             Section("Copilot") {
                 Picker("Plan", selection: Binding(

@@ -202,8 +202,15 @@ final class UsageStore: ObservableObject {
 
         do {
             usageRows = try await usageRequest
-            out[.actions] = Self.actionsMetric(rows: usageRows, publicRepos: publicRepos,
-                                               included: Self.includedActionsMinutes(plan: plan), start: start, end: end)
+            var metric = Self.actionsMetric(rows: usageRows, publicRepos: publicRepos,
+                                            included: Self.includedActionsMinutes(plan: plan), start: start, end: end)
+            let budgetAmount = defaults.double(forKey: SettingsKey.actionsBudget)
+            if budgetAmount > 0 {
+                metric.budget = Self.actionsBudget(rows: usageRows, amount: budgetAmount,
+                                                   stopsUsage: defaults.bool(forKey: SettingsKey.actionsBudgetStops),
+                                                   now: date, end: end)
+            }
+            out[.actions] = metric
         } catch {
             issues[.actions] = error.localizedDescription
         }
@@ -257,6 +264,46 @@ final class UsageStore: ObservableObject {
             daily: daily(counted.map { ($0.date, equivalent($0)) }),
             note: hasWeighted ? "Counted as Linux minutes: macOS runners use about 10×, Windows 2×. Public repos are free." : nil)
     }
+
+    /// The budget covers everything billed for the Actions product beyond the included usage
+    /// (minutes and storage), i.e. the sum of net amounts.
+    nonisolated static func actionsBudget(rows: [BillingItem], amount: Double, stopsUsage: Bool,
+                                          now: Date, end: Date) -> ActionsBudget {
+        let actions = rows.filter { ($0.product ?? "").lowercased() == "actions" }
+        let spent = actions.reduce(0) { $0 + ($1.netAmount ?? 0) }
+        let remaining = max(0, amount - spent)
+
+        // Recent daily rate: net spend over the last 7 days (including today).
+        let iso = ISO8601DateFormatter()
+        let windowStart = now.addingTimeInterval(-7 * 86_400)
+        let recent = actions.filter { ($0.date.flatMap(iso.date(from:)) ?? .distantPast) > windowStart }
+            .reduce(0) { $0 + ($1.netAmount ?? 0) }
+        let perDay = recent / 7
+        let daysLeft = max(0, end.timeIntervalSince(now) / 86_400)
+        let projected = perDay > 0 ? spent + perDay * daysLeft : nil
+        var runsOut: Date? = nil
+        if perDay > 0, remaining > 0 {
+            let at = now.addingTimeInterval(remaining / perDay * 86_400)
+            if at < end { runsOut = at }
+        } else if remaining <= 0 {
+            runsOut = now
+        }
+
+        // What the remaining dollars buy on each runner type seen this period.
+        var rates: [String: Double] = [:]
+        for r in actions where (unitOf(r)) == "minutes" {
+            let sku = (r.sku ?? "").lowercased()
+            let runner = sku.contains("macos") ? "macOS" : sku.contains("windows") ? "Windows" : sku.contains("linux") ? "Linux" : nil
+            if let runner, let price = r.pricePerUnit, price > 0 { rates[runner] = max(rates[runner] ?? 0, price) }
+        }
+        if rates["Linux"] == nil { rates["Linux"] = 0.006 }
+        let order = ["macOS", "Windows", "Linux"]
+        let runway = order.compactMap { name in rates[name].map { ActionsBudget.Runway(runner: name, minutes: remaining / $0) } }
+        return ActionsBudget(amount: amount, spent: spent, stopsUsage: stopsUsage,
+                             projectedSpend: projected, runsOutAt: runsOut, runway: runway)
+    }
+
+    private nonisolated static func unitOf(_ r: BillingItem) -> String { (r.unitType ?? "").lowercased() }
 
     /// Copilot since June 2026 bills AI Credits in dollars. Annual plans keep premium requests until
     /// renewal, so fall back to those when there's request usage but no credit usage.
@@ -372,11 +419,13 @@ final class UsageStore: ObservableObject {
             .core: window(.core, 3120, 5000, 22 * 60, 3600),
             .graphql: window(.graphql, 410, 5000, 41 * 60, 3600),
             .search: window(.search, 4, 30, 40, 60),
-            .actions: UsageMetric(kind: .actions, used: 1860, limit: 3000, periodStart: start, resetAt: end, netAmount: 0,
+            .actions: UsageMetric(kind: .actions, used: 3000, limit: 3000, periodStart: start, resetAt: end, netAmount: 0,
                                   breakdown: [.init(label: "you/web-app", quantity: 820, netAmount: 0),
                                               .init(label: "you/cli-tool", quantity: 420, netAmount: 0)],
                                   daily: days,
-                                  note: "Counted as Linux minutes: macOS runners use about 10×, Windows 2×. Public repos are free."),
+                                  note: "Counted as Linux minutes: macOS runners use about 10×, Windows 2×. Public repos are free.",
+                                  budget: ActionsBudget(amount: 20, spent: 6.4, stopsUsage: true, projectedSpend: 14.9, runsOutAt: nil,
+                                                        runway: [.init(runner: "macOS", minutes: 219), .init(runner: "Linux", minutes: 2266)])),
             .copilot: UsageMetric(kind: .copilot, used: 7.12, limit: 10, periodStart: start, resetAt: end, netAmount: 0,
                                   breakdown: [.init(label: "Claude Sonnet", quantity: 5.04, netAmount: 0),
                                               .init(label: "GPT-5", quantity: 2.08, netAmount: 0)],
@@ -427,7 +476,8 @@ final class UsageStore: ObservableObject {
                                        percent: Int(($0.fraction * 100).rounded()), resetAt: $0.resetAt) }
             },
             pullRequests: pullRequests.map { .init(waitingOnYou: $0.waitingOnYouTotal, yours: $0.yoursTotal) },
-            actionsFailing: actions?.failing.count)
+            actionsFailing: actions?.failing.count,
+            actionsBudget: metrics[.actions]?.budget.map { .init(amount: $0.amount, spent: $0.spent, stopsUsage: $0.stopsUsage) })
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]

@@ -53,6 +53,13 @@ enum Entry {
                     print(pad(k.title, 26) + "unavailable: \(issue)")
                 }
             }
+            if let b = store.metrics[.actions]?.budget {
+                let runway = b.runway.map { "\(Int($0.minutes)) \($0.runner)" }.joined(separator: " / ")
+                print(String(format: "actions budget: $%.2f of $%.2f%@ | runway: %@ min | projected: %@%@",
+                             b.spent, b.amount, b.stopsUsage ? " (stops Actions)" : "", runway,
+                             b.projectedSpend.map { String(format: "$%.2f", $0) } ?? "n/a",
+                             b.runsOutAt.map { " | runs out ~\($0.formatted(date: .abbreviated, time: .omitted))" } ?? ""))
+            }
             if let q = store.pullRequests {
                 print("pull requests waiting on you: \(q.waitingOnYouTotal) | yours open: \(q.yoursTotal)")
                 for pr in q.waitingOnYou.prefix(5) + q.yours.prefix(5) {

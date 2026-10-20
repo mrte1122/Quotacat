@@ -77,6 +77,14 @@ enum UsageMath {
         return "→\(max(1, s / 60))M"
     }
 
+    /// Compact age for list rows: "45m", "20h", "3d".
+    static func age(since date: Date, now: Date) -> String {
+        let s = Int(max(0, now.timeIntervalSince(date)))
+        if s < 3600 { return "\(max(1, s / 60))m" }
+        if s < 48 * 3600 { return "\(s / 3600)h" }
+        return "\(s / 86_400)d"
+    }
+
     static func monthBounds(containing date: Date) -> (start: Date, end: Date) {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
@@ -128,6 +136,17 @@ enum SelfTest {
         let b = UsageMath.monthBounds(containing: mid)
         check(ISO8601DateFormatter().string(from: b.start) == "2026-10-01T00:00:00Z", "month start")
         check(ISO8601DateFormatter().string(from: b.end) == "2026-11-01T00:00:00Z", "month end")
+        check(UsageMath.age(since: t0, now: t0.addingTimeInterval(30)) == "1m", "age floor 1m")
+        check(UsageMath.age(since: t0, now: t0.addingTimeInterval(5 * 3600)) == "5h", "age hours")
+        check(UsageMath.age(since: t0, now: t0.addingTimeInterval(47 * 3600)) == "47h", "age under 2 days")
+        check(UsageMath.age(since: t0, now: t0.addingTimeInterval(3 * 86_400)) == "3d", "age days")
+        let sample = #"{"data":{"waiting":{"issueCount":2,"nodes":[{"number":7,"title":"Fix it","url":"https://github.com/a/b/pull/7","createdAt":"2026-10-01T12:00:00Z","isDraft":false,"reviewDecision":"REVIEW_REQUIRED","repository":{"nameWithOwner":"a/b"},"author":null},{}]},"yours":{"issueCount":0,"nodes":[]}}}"#
+        if let q = try? GitHubClient.decodePullRequests(Data(sample.utf8)) {
+            check(q.waitingOnYou.count == 1 && q.waitingOnYouTotal == 2 && q.waitingOnYou[0].author == nil,
+                  "PR decode skips empty nodes, keeps ghost authors")
+        } else {
+            check(false, "PR decode")
+        }
         check(Updater.isVersion("1.1.0", newerThan: "1.0.0"), "version minor bump")
         check(Updater.isVersion("1.10.0", newerThan: "1.9.0"), "version numeric not lexical")
         check(Updater.isVersion("2.0", newerThan: "1.9.9"), "version different lengths")

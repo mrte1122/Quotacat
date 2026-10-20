@@ -9,6 +9,15 @@ struct PopoverView: View {
     @AppStorage(SettingsKey.paceColoring) private var paceColoring = true
     @AppStorage(SettingsKey.showTimeMarker) private var showTimeMarker = true
     @AppStorage(SettingsKey.radialMeters) private var radialMeters = false
+    @AppStorage(SettingsKey.pullRequestsEnabled) private var pullRequestsEnabled = true
+    @AppStorage(SettingsKey.popoverTab) private var tab = "quotas"
+
+    private var showingPullRequests: Bool { pullRequestsEnabled && tab == "pulls" }
+
+    private var pullRequestsTabTitle: String {
+        guard let n = store.pullRequests?.waitingOnYouTotal, n > 0 else { return "Pull requests" }
+        return "Pull requests (\(n))"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -16,8 +25,20 @@ struct PopoverView: View {
             locationBanner
             updateBanner
             banner
-            section("API rate limits", kinds: MetricKind.rateLimits)
-            section("This month", kinds: MetricKind.billing)
+            if pullRequestsEnabled {
+                Picker("View", selection: $tab) {
+                    Text("Quotas").tag("quotas")
+                    Text(pullRequestsTabTitle).tag("pulls")
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+            if showingPullRequests {
+                PullRequestsView(queue: store.pullRequests, issue: store.pullRequestIssue, now: store.now)
+            } else {
+                section("API rate limits", kinds: MetricKind.rateLimits)
+                section("This month", kinds: MetricKind.billing)
+            }
             Divider()
             footer
         }
@@ -34,7 +55,7 @@ struct PopoverView: View {
             }
             Spacer()
             Button {
-                Task { await store.refresh() }
+                Task { await store.refresh(forcePullRequests: true) }
             } label: {
                 if store.isRefreshing {
                     ProgressView().controlSize(.small)

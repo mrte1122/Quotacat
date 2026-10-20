@@ -5,7 +5,7 @@
 <h1 align="center">Quotacat</h1>
 
 <p align="center">
-  Your GitHub quotas in the macOS menu bar: API rate limits, Actions minutes, and Copilot premium requests.
+  Your GitHub quotas in the macOS menu bar: API rate limits, Actions minutes, Copilot premium requests, and the pull requests waiting on you.
 </p>
 
 <p align="center">
@@ -22,6 +22,10 @@
   <img src="docs/popover-dark.png" width="360" alt="Quotacat popover in dark mode">
   &nbsp;
   <img src="docs/popover-light.png" width="360" alt="Quotacat popover in light mode">
+</p>
+
+<p align="center">
+  <img src="docs/popover-pulls-light.png" width="360" alt="Pull requests tab">
 </p>
 
 ## What it shows
@@ -43,6 +47,9 @@ Also included:
 - Five menu-bar styles (progress bar, battery, radial, percentage, text only), monochrome mode,
   and a "show remaining" option
 - Popover meters as horizontal bars or radial rings
+- **Pull requests tab:** PRs waiting on your review (oldest first, turning orange after 3 days and
+  red after 7) and your own open PRs with their review status. The menu bar can show how many
+  reviews are waiting on you, and you can get a notification for each new review request.
 - Notifications at 75%, 90% and 95%, and when a limit resets
 - A refresh interval from 10 seconds to 5 minutes, plus refreshes on wake and when the network returns
 - Daily usage charts for the month

@@ -91,4 +91,7 @@ struct UsageCacheFile: Codable {
     let login: String?
     let updatedAt: Date
     let metrics: [Entry]
+    /// Open PR counts, when the pull request feature is on.
+    struct PullRequestCounts: Codable { let waitingOnYou: Int; let yours: Int }
+    var pullRequests: PullRequestCounts? = nil
 }

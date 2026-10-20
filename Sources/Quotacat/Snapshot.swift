@@ -31,12 +31,15 @@ enum Snapshot {
             // Render through a real NSHostingView (not ImageRenderer) so AppKit-backed
             // buttons and links draw instead of placeholder blocks.
             let savedRadial = d.object(forKey: SettingsKey.radialMeters)
-            let variants: [(name: String, appearance: NSAppearance.Name, radial: Bool)] = [
-                ("light", .aqua, false), ("dark", .darkAqua, false),
-                ("radial-light", .aqua, true), ("radial-dark", .darkAqua, true),
+            let savedTab = d.object(forKey: SettingsKey.popoverTab)
+            let variants: [(name: String, appearance: NSAppearance.Name, radial: Bool, tab: String)] = [
+                ("light", .aqua, false, "quotas"), ("dark", .darkAqua, false, "quotas"),
+                ("radial-light", .aqua, true, "quotas"), ("radial-dark", .darkAqua, true, "quotas"),
+                ("pulls-light", .aqua, false, "pulls"), ("pulls-dark", .darkAqua, false, "pulls"),
             ]
-            for (name, appearanceName, radial) in variants {
+            for (name, appearanceName, radial, tab) in variants {
                 d.set(radial, forKey: SettingsKey.radialMeters)
+                d.set(tab, forKey: SettingsKey.popoverTab)
                 let view = PopoverView(store: store, updater: Updater(), openSettings: {})
                     .background(Color(nsColor: .windowBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -55,6 +58,7 @@ enum Snapshot {
                 }
             }
             d.set(savedRadial, forKey: SettingsKey.radialMeters)
+            d.set(savedTab, forKey: SettingsKey.popoverTab)
             print("Snapshots written to \(dir.path)")
             exit(0)
         }

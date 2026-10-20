@@ -16,6 +16,11 @@ final class UsageStore: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var isRefreshing = false
     @Published private(set) var now = Date()
+    @Published private(set) var pullRequests: PullRequestQueue?
+    @Published private(set) var pullRequestIssue: String?
+    private var lastPullRequestFetch = Date.distantPast
+    /// PR lists change slowly; don't spend API calls on them every 10 seconds.
+    private static let pullRequestInterval: TimeInterval = 120
 
     let notifier = Notifier()
     private var refreshTimer: Timer?
@@ -78,7 +83,7 @@ final class UsageStore: ObservableObject {
         Task { await refresh() }
     }
 
-    func refresh(notify: Bool = true) async {
+    func refresh(notify: Bool = true, forcePullRequests: Bool = false) async {
         guard !isRefreshing else { return }
         isRefreshing = true
         lastRefreshStart = Date()
@@ -119,6 +124,20 @@ final class UsageStore: ObservableObject {
                 let (billing, billingIssues) = await loadBilling(client: client, login: user.login)
                 newMetrics.merge(billing) { $1 }
                 newIssues.merge(billingIssues) { $1 }
+            }
+
+            if UserDefaults.standard.bool(forKey: SettingsKey.pullRequestsEnabled),
+               forcePullRequests || Date().timeIntervalSince(lastPullRequestFetch) >= Self.pullRequestInterval {
+                do {
+                    let queue = try await client.fetchPullRequests(login: user.login)
+                    pullRequests = queue
+                    pullRequestIssue = nil
+                    lastPullRequestFetch = Date()
+                    if notify { notifier.evaluateReviewRequests(queue.waitingOnYou) }
+                } catch {
+                    // A PR failure shouldn't hide the quota data that did load.
+                    pullRequestIssue = error.localizedDescription
+                }
             }
 
             metrics = newMetrics
@@ -246,6 +265,19 @@ final class UsageStore: ObservableObject {
         lastUpdated = now
         lastError = nil
         self.now = now
+        func pr(_ n: Int, _ title: String, _ repo: String, _ author: String, _ hoursAgo: Double, _ decision: ReviewDecision? = nil, draft: Bool = false) -> PullRequestItem {
+            PullRequestItem(number: n, title: title, url: URL(string: "https://github.com/\(repo)/pull/\(n)")!, repo: repo,
+                            author: author, createdAt: now.addingTimeInterval(-hoursAgo * 3600), isDraft: draft, reviewDecision: decision)
+        }
+        pullRequests = PullRequestQueue(
+            waitingOnYou: [pr(212, "Migrate settings storage to SwiftData", "acme/web-app", "sam", 24 * 9),
+                           pr(48, "Fix flaky checkout test on Intel runners", "acme/cli-tool", "riley", 30),
+                           pr(219, "Add dark mode to onboarding", "acme/web-app", "jordan", 3)],
+            waitingOnYouTotal: 3,
+            yours: [pr(205, "Cache API responses with ETags", "acme/web-app", "you", 24 * 4, .changesRequested),
+                    pr(51, "Speed up cold start by 40%", "acme/cli-tool", "you", 26, .approved),
+                    pr(220, "Experiment: radial gauges", "you/playground", "you", 2, draft: true)],
+            yoursTotal: 3)
     }
 
     static var cacheURL: URL {
@@ -260,7 +292,8 @@ final class UsageStore: ObservableObject {
             metrics: MetricKind.allCases.compactMap { k in
                 metrics[k].map { .init(kind: k.rawValue, used: $0.used, limit: $0.limit,
                                        percent: Int(($0.fraction * 100).rounded()), resetAt: $0.resetAt) }
-            })
+            },
+            pullRequests: pullRequests.map { .init(waitingOnYou: $0.waitingOnYouTotal, yours: $0.yoursTotal) })
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]

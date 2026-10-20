@@ -37,7 +37,7 @@ enum Entry {
     private static func runOnce() -> Never {
         let store = UsageStore()
         Task { @MainActor in
-            await store.refresh(notify: false)
+            await store.refresh(notify: false, forcePullRequests: true)
             print("login:", store.login ?? "-", "| credential:", store.tokenSource?.rawValue ?? "none",
                   "| scopes:", store.scopes?.sorted().joined(separator: ",") ?? "n/a")
             if let e = store.lastError { print("error:", e) }
@@ -52,6 +52,14 @@ enum Entry {
                 } else if let issue = store.issues[k] {
                     print(pad(k.title, 26) + "unavailable: \(issue)")
                 }
+            }
+            if let q = store.pullRequests {
+                print("pull requests waiting on you: \(q.waitingOnYouTotal) | yours open: \(q.yoursTotal)")
+                for pr in q.waitingOnYou.prefix(5) + q.yours.prefix(5) {
+                    print("  \(pr.repo) #\(pr.number)  \(UsageMath.age(since: pr.createdAt, now: Date()))  \(pr.reviewDecision?.rawValue ?? (pr.isDraft ? "DRAFT" : "-"))")
+                }
+            } else if let e = store.pullRequestIssue {
+                print("pull requests: unavailable: \(e)")
             }
             print("cache:", UsageStore.cacheURL.path)
             exit(store.lastError == nil ? 0 : 1)

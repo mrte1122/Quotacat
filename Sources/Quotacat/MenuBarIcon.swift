@@ -45,8 +45,17 @@ enum MenuBarIconRenderer {
                 countdown: countdown ? UsageMath.compactCountdown(to: m.resetAt, now: now) : nil)
         }
 
+        // Pull requests waiting on your review, shown after the meters when there are any.
+        let prCount = d.bool(forKey: SettingsKey.pullRequestsEnabled) && d.bool(forKey: SettingsKey.menuBarPullRequests)
+            ? (store.pullRequests?.waitingOnYouTotal ?? 0) : 0
+        let prStale = store.pullRequests?.waitingOnYou.contains { now.timeIntervalSince($0.createdAt) >= 3 * 86_400 } ?? false
+        let prColor: NSColor = mono ? .black : (prStale ? .systemOrange : .labelColor)
+        let prText = "\(prCount)"
+        let prSymbolWidth: CGFloat = 13
+        let prWidth = prCount > 0 ? ceil(prSymbolWidth + 2 + textSize(prText, font).width) : 0
+
         // "App logo mode" when nothing is selected or nothing has loaded yet.
-        guard !segments.isEmpty else {
+        guard !segments.isEmpty || prCount > 0 else {
             let name = store.lastError != nil && !store.hasData ? "exclamationmark.triangle" : "chart.bar.xaxis"
             let img = NSImage(systemSymbolName: name, accessibilityDescription: "Quotacat")!
             img.isTemplate = true
@@ -55,12 +64,27 @@ enum MenuBarIconRenderer {
 
         let widths = segments.map { width(of: $0, style: style) }
         let gap: CGFloat = 8
-        let total = widths.reduce(0, +) + gap * CGFloat(segments.count - 1)
+        var total = widths.reduce(0, +) + gap * CGFloat(max(0, segments.count - 1))
+        if prCount > 0 { total += (segments.isEmpty ? 0 : gap) + prWidth }
         let image = NSImage(size: NSSize(width: ceil(total), height: height), flipped: false) { _ in
             var x: CGFloat = 0
             for (seg, w) in zip(segments, widths) {
                 draw(seg, style: style, mono: mono, at: x)
                 x += w + gap
+            }
+            if prCount > 0 {
+                if segments.isEmpty { x = 0 }
+                let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+                    .applying(.init(paletteColors: [prColor]))
+                if let symbol = NSImage(systemSymbolName: "arrow.triangle.pull", accessibilityDescription: "Pull requests")?
+                    .withSymbolConfiguration(config) {
+                    let s = symbol.size
+                    symbol.draw(in: NSRect(x: x + (prSymbolWidth - s.width) / 2, y: (height - s.height) / 2,
+                                           width: s.width, height: s.height))
+                }
+                let size = textSize(prText, font)
+                (prText as NSString).draw(at: NSPoint(x: x + prSymbolWidth + 2, y: height / 2 - size.height / 2),
+                                          withAttributes: [.font: font, .foregroundColor: prColor])
             }
             return true
         }

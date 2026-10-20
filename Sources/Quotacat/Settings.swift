@@ -49,6 +49,10 @@ enum SettingsKey {
     static let showCountdown = "showCountdown"
     static let paceColoring = "paceColoring"
     static let showTimeMarker = "showTimeMarker"
+    static let pullRequestsEnabled = "pullRequestsEnabled"
+    static let menuBarPullRequests = "menuBarPullRequests"
+    static let notifyReviewRequests = "notifyReviewRequests"
+    static let popoverTab = "popoverTab"                  // "quotas" or "pulls"
     static let radialMeters = "radialMeters"            // popover: ring gauges instead of bars
     static let notificationsEnabled = "notificationsEnabled"
     static let actionsQuota = "actionsQuota"
@@ -73,6 +77,10 @@ enum SettingsKey {
             paceColoring: true,
             showTimeMarker: true,
             radialMeters: false,
+            pullRequestsEnabled: true,
+            menuBarPullRequests: true,
+            notifyReviewRequests: true,
+            popoverTab: "quotas",
             notificationsEnabled: true,
             actionsQuota: 2000.0,   // GitHub Free; Pro is 3000
             copilotQuota: 300.0,    // Copilot Pro; Free is 50, Pro+ is 1500

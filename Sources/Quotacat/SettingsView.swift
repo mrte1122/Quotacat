@@ -21,6 +21,9 @@ private struct GeneralSettings: View {
     @ObservedObject var store: UsageStore
     @ObservedObject var updater: Updater
     @AppStorage(SettingsKey.autoUpdateCheck) private var autoUpdate = true
+    @AppStorage(SettingsKey.pullRequestsEnabled) private var pullRequests = true
+    @AppStorage(SettingsKey.menuBarPullRequests) private var menuBarPullRequests = true
+    @AppStorage(SettingsKey.notifyReviewRequests) private var notifyReviewRequests = true
     @AppStorage(SettingsKey.refreshInterval) private var interval = 60.0
     @AppStorage(SettingsKey.notificationsEnabled) private var notifications = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -55,6 +58,18 @@ private struct GeneralSettings: View {
                     Text("\(Int(interval)) seconds")
                 } minimumValueLabel: { Text("10s") } maximumValueLabel: { Text("300s") }
                 Text("\(preset). Rate-limit checks are free; billing data updates a few times a day on GitHub's side.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Pull requests") {
+                Toggle("Show pull requests", isOn: $pullRequests)
+                    .onChange(of: pullRequests) { _, on in if on { Task { await store.refresh(notify: false, forcePullRequests: true) } } }
+                Group {
+                    Toggle("Show reviews waiting on me in the menu bar", isOn: $menuBarPullRequests)
+                    Toggle("Notify me about new review requests", isOn: $notifyReviewRequests)
+                        .onChange(of: notifyReviewRequests) { _, on in if on { store.notifier.requestAuthorization() } }
+                }
+                .disabled(!pullRequests)
+                Text("Lists open PRs waiting on your review and your own open PRs. Refreshed every 2 minutes, or when you click refresh.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Notifications") {

@@ -55,6 +55,15 @@ monitor for Claude plan limits. Quotacat shares no code with it. It adopts these
 - GitHub only reports your plan to tokens with the `user` scope, so included amounts are
   configurable: Actions defaults to 2,000 minutes (Free plan), Copilot to 300 requests (Pro).
 
+## Pull requests
+
+One GraphQL request fetches two searches: `is:pr is:open archived:false review-requested:<login>`
+(which includes team review requests) and `... author:<login>`, each sorted oldest first, 30 results
+with total counts. That costs about one point of the 5,000/hour GraphQL budget instead of two calls
+against the 30/minute search limit. The lists refresh at most every 2 minutes, or immediately on a
+manual refresh. Review-request notifications are seeded on the first fetch, so only requests that
+arrive while Quotacat is running notify. Counts are also written to the shell cache file.
+
 ## Credentials
 
 1. The GitHub CLI login, via `gh auth token`. GUI apps don't inherit your shell `PATH`, so the
@@ -116,6 +125,8 @@ Sources/Quotacat/
   PopoverView.swift    dashboard cards (bars or radial meters), banner, breakdowns, daily charts
   SettingsView.swift   General / Appearance / Account / Quotas tabs
   Snapshot.swift       offscreen renders of the popover and icons (README screenshots)
+  PullRequests.swift   PR models, GraphQL fetch and decoding
+  PullRequestsView.swift  the Pull requests tab
   Updater.swift        release check, signature verification, in-place install and relaunch
 
 scripts/

@@ -51,6 +51,20 @@ final class Notifier {
         UserDefaults.standard.set(Array(sent.sorted().suffix(300)), forKey: SettingsKey.sentNotifications)
     }
 
+    /// nil until the first fetch, so PRs that were already waiting don't all notify at launch.
+    private var knownReviewRequests: Set<String>?
+
+    func evaluateReviewRequests(_ items: [PullRequestItem]) {
+        let ids = Set(items.map(\.id))
+        defer { knownReviewRequests = ids }
+        guard let known = knownReviewRequests,
+              UserDefaults.standard.bool(forKey: SettingsKey.notifyReviewRequests) else { return }
+        for pr in items.filter({ !known.contains($0.id) }).prefix(3) {
+            post(title: "Review requested: \(pr.repo) #\(pr.number)",
+                 body: pr.author.map { "\(pr.title) (from @\($0))" } ?? pr.title)
+        }
+    }
+
     func post(title: String, body: String) {
         guard available else { return }
         let content = UNMutableNotificationContent()

@@ -156,6 +156,25 @@ enum SelfTest {
                     run(6, 2, "completed", "timed_out"), run(5, 3, "completed", "cancelled"), run(4, 2, "completed", "success")]
         let failing = ActionsStatus.failing(repo: "a/b", branch: "main", runs: runs)
         check(failing.map(\.workflowID) == [2], "Actions: only workflows whose latest completed run failed")
+        // Real-shaped billing data (Pro plan, Oct 2026): macOS minutes exhaust the 3,000-minute allowance.
+        func row(_ repo: String, _ sku: String, _ qty: Double, _ price: Double, _ gross: Double, _ disc: Double, _ net: Double) -> BillingItem {
+            BillingItem(date: "2026-10-07T00:00:00Z", product: "actions", sku: sku, quantity: qty, unitType: "Minutes",
+                        pricePerUnit: price, grossAmount: gross, discountAmount: disc, netAmount: net, repositoryName: repo)
+        }
+        let rows = [row("Claros", "Actions Linux", 17, 0.006, 0.13, 0.13, 0), row("Fletcher", "Actions Linux", 2, 0.006, 0.012, 0.012, 0),
+                    row("Vybe", "Actions macOS 3-core", 340.03, 0.062, 21.082, 17.858, 3.224),
+                    row("Quotacat", "Actions macOS 3-core", 50, 0.062, 3.1, 3.1, 0)]
+        let am = UsageStore.actionsMetric(rows: rows, publicRepos: ["quotacat"], included: 3000, start: t0, end: t1)
+        check(abs(am.used - 3000) < 0.5 && abs(am.fraction - 1) < 0.001, "Actions: macOS weighted, allowance fully used")
+        check(abs((am.netAmount ?? 0) - 3.224) < 0.001, "Actions: overage billed amount")
+        check(!am.breakdown.contains { $0.label == "Quotacat" }, "Actions: public repos excluded")
+        check(am.note != nil, "Actions: weighting note shown when non-Linux runners used")
+        let credit = PremiumItem(model: "Claude Sonnet", sku: "copilot_ai_credit", grossQuantity: 712, grossAmount: 7.12, netAmount: 0)
+        let cm = UsageStore.copilotMetric(credits: [credit], premium: [], usageRows: [], includedCredits: 10, includedRequests: 300, start: t0, end: t1)
+        check(cm.isCurrency && cm.amountText == "$7.12 / $10.00", "Copilot: AI Credits in dollars")
+        let legacy = PremiumItem(model: "GPT-5", sku: "premium", grossQuantity: 42, grossAmount: 1.68, netAmount: 0)
+        let lm = UsageStore.copilotMetric(credits: [], premium: [legacy], usageRows: [], includedCredits: 10, includedRequests: 300, start: t0, end: t1)
+        check(!lm.isCurrency && lm.displayTitle == "Copilot Premium Requests" && lm.used == 42, "Copilot: annual plans keep premium requests")
         check(Updater.isVersion("1.1.0", newerThan: "1.0.0"), "version minor bump")
         check(Updater.isVersion("1.10.0", newerThan: "1.9.0"), "version numeric not lexical")
         check(Updater.isVersion("2.0", newerThan: "1.9.9"), "version different lengths")

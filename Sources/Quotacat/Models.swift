@@ -11,7 +11,7 @@ enum MetricKind: String, CaseIterable, Identifiable, Codable {
         case .graphql: return "GraphQL API"
         case .search: return "Search API"
         case .actions: return "Actions Minutes"
-        case .copilot: return "Copilot Premium Requests"
+        case .copilot: return "Copilot AI Credits"
         }
     }
 
@@ -75,8 +75,24 @@ struct UsageMetric: Identifiable {
     var netAmount: Double? = nil
     var breakdown: [BreakdownItem] = []
     var daily: [DailyPoint] = []
+    /// Overrides `kind.title`, e.g. "Copilot Premium Requests" for annual plans still on requests.
+    var title: String? = nil
+    /// Amounts are dollars (Copilot AI Credits) rather than counts.
+    var isCurrency = false
+    /// One-line explanation under the card, e.g. how Actions minutes are weighted.
+    var note: String? = nil
 
     var fraction: Double { UsageMath.fraction(used: used, limit: limit) }
+    var displayTitle: String { title ?? kind.title }
+
+    func format(_ value: Double) -> String {
+        isCurrency ? String(format: "$%.2f", value) : UsageMath.formatQuantity(value)
+    }
+
+    /// "330 / 3000 min" or "$4.20 / $10.00".
+    var amountText: String {
+        isCurrency ? "\(format(used)) / \(format(limit))" : "\(format(used)) / \(format(limit)) \(kind.unit)"
+    }
 }
 
 /// Snapshot written to disk on each refresh for shell prompts / statuslines.

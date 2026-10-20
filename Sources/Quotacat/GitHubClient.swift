@@ -29,6 +29,9 @@ struct BillingItem: Decodable {
     let sku: String?
     let quantity: Double?
     let unitType: String?
+    let pricePerUnit: Double?
+    let grossAmount: Double?
+    let discountAmount: Double?
     let netAmount: Double?
     let repositoryName: String?
 }
@@ -37,6 +40,7 @@ struct PremiumItem: Decodable {
     let model: String?
     let sku: String?
     let grossQuantity: Double?
+    let grossAmount: Double?
     let netAmount: Double?
 }
 
@@ -66,14 +70,16 @@ struct GitHubClient {
     }
 
     /// Returns the login and the classic-token scopes (nil for fine-grained tokens, which send no header).
-    func fetchUser() async throws -> (login: String, scopes: Set<String>?) {
+    /// The plan name ("free", "pro", …) is only included for tokens with the `user` scope.
+    func fetchUser() async throws -> (login: String, scopes: Set<String>?, plan: String?) {
         let (data, http) = try await get("user")
-        struct U: Decodable { let login: String }
-        let login = try JSONDecoder().decode(U.self, from: data).login
+        struct U: Decodable { struct Plan: Decodable { let name: String? }; let login: String; let plan: Plan? }
+        let user = try JSONDecoder().decode(U.self, from: data)
+        let login = user.login
         let scopes = (http.value(forHTTPHeaderField: "X-OAuth-Scopes")).map {
             Set($0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
         }
-        return (login, scopes)
+        return (login, scopes, user.plan?.name?.lowercased())
     }
 
     /// `/rate_limit` itself does not count against the rate limit.
@@ -92,6 +98,14 @@ struct GitHubClient {
     func fetchPremiumRequests(user: String, year: Int, month: Int) async throws -> [PremiumItem] {
         struct R: Decodable { let usageItems: [PremiumItem]? }
         let data = try await billingGet("users/\(user)/settings/billing/premium_request/usage", year: year, month: month)
+        return try JSONDecoder().decode(R.self, from: data).usageItems ?? []
+    }
+
+    /// Copilot usage-based billing (from June 2026): spend metered in AI Credits, priced per model.
+    /// Same item schema as premium requests; amounts are in dollars.
+    func fetchAICredits(user: String, year: Int, month: Int) async throws -> [PremiumItem] {
+        struct R: Decodable { let usageItems: [PremiumItem]? }
+        let data = try await billingGet("users/\(user)/settings/billing/ai_credit/usage", year: year, month: month)
         return try JSONDecoder().decode(R.self, from: data).usageItems ?? []
     }
 

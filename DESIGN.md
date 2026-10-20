@@ -1,7 +1,7 @@
 # Quotacat — Design
 
 Quotacat puts your GitHub quotas in the macOS menu bar: API rate limits, Actions minutes,
-and Copilot premium requests, each with a reset countdown and a pace projection.
+and Copilot AI Credits, each with a reset countdown and a pace projection.
 
 ## Inspiration
 
@@ -43,17 +43,26 @@ monitor for Claude plan limits. Quotacat shares no code with it. It adopts these
 | GraphQL API rate limit | 1 hour | `GET /rate_limit` → `resources.graphql` |
 | Search API rate limit | 1 minute | `GET /rate_limit` → `resources.search` |
 | Actions minutes | calendar month (UTC) | `GET /users/{user}/settings/billing/usage?year&month` |
-| Copilot premium requests | calendar month (UTC) | `GET /users/{user}/settings/billing/premium_request/usage?year&month` |
+| Copilot AI Credits | calendar month (UTC) | `GET /users/{user}/settings/billing/ai_credit/usage?year&month` |
+| Copilot premium requests (annual plans) | calendar month (UTC) | `GET /users/{user}/settings/billing/premium_request/usage?year&month` |
 
 - `/rate_limit` does not count against your rate limit, so frequent refreshes are free.
 - The billing endpoints need a classic token with the **`user` scope**, and an account on
   GitHub's enhanced billing platform. Quotacat reads `X-OAuth-Scopes` from `/user`; if `user` is
   missing it skips those calls and shows how to add the scope instead of failing.
-- Actions usage sums `quantity` for items whose product is `actions` and whose unit is minutes,
-  broken down by repository. Copilot sums `grossQuantity`, broken down by model. Net billed
-  amounts are shown when non-zero.
-- GitHub only reports your plan to tokens with the `user` scope, so included amounts are
-  configurable: Actions defaults to 2,000 minutes (Free plan), Copilot to 300 requests (Pro).
+- **Actions minutes** are weighted the way GitHub bills them. The plan's allowance is in standard
+  Linux minutes, and the usage report applies it as a dollar discount. So allowance used =
+  sum of `discountAmount` on private-repository minute rows / the Linux per-minute price (0.006).
+  macOS minutes (about 10× the price) and Windows (2×) are weighted automatically, larger runners
+  (never covered by the allowance) don't count, and public repositories (free) are excluded using
+  the repository list. Overage is the sum of `netAmount`. The breakdown and daily chart show
+  Linux-equivalent minutes (`grossAmount` / Linux price).
+- **Included minutes** come from the plan (`GET /user` → `plan.name`, visible with the `user`
+  scope): Free 2,000, Pro 3,000, Team 3,000, Enterprise 50,000. Can be overridden in Settings.
+- **Copilot** moved to usage-based billing on June 1, 2026: AI Credits, metered in dollars by
+  tokens per model (Pro includes $10/month, Pro+ $39). Quotacat sums `grossAmount` from the AI
+  credit endpoint, broken down by model. Annual plans keep premium requests until renewal, so if
+  there is premium-request usage and no credit usage, it shows requests instead.
 
 ## Pull requests
 

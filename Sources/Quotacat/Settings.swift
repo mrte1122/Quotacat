@@ -61,6 +61,8 @@ enum SettingsKey {
     static let radialMeters = "radialMeters"            // popover: ring gauges instead of bars
     static let notificationsEnabled = "notificationsEnabled"
     static let actionsQuota = "actionsQuota"
+    static let actionsQuotaFromPlan = "actionsQuotaFromPlan"   // use the GitHub plan's included minutes
+    static let copilotCredits = "copilotCredits"               // included AI Credits, in dollars
     static let copilotQuota = "copilotQuota"
     static let preferPAT = "preferPAT"
     static let sentNotifications = "sentNotifications"
@@ -92,7 +94,9 @@ enum SettingsKey {
             actionsRepoMode: "recent",
             actionsSelectedRepos: [String](),
             notificationsEnabled: true,
-            actionsQuota: 2000.0,   // GitHub Free; Pro is 3000
+            actionsQuota: 2000.0,
+            actionsQuotaFromPlan: true,
+            copilotCredits: 10.0,     // Copilot Pro; Pro+ includes $39   // GitHub Free; Pro is 3000
             copilotQuota: 300.0,    // Copilot Pro; Free is 50, Pro+ is 1500
             preferPAT: false,
             autoUpdateCheck: true,

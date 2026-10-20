@@ -297,23 +297,42 @@ private struct AccountSettings: View {
 
 private struct QuotaSettings: View {
     @ObservedObject var store: UsageStore
+    @AppStorage(SettingsKey.actionsQuotaFromPlan) private var fromPlan = true
     @AppStorage(SettingsKey.actionsQuota) private var actions = 2000.0
-    @AppStorage(SettingsKey.copilotQuota) private var copilot = 300.0
+    @AppStorage(SettingsKey.copilotCredits) private var credits = 10.0
+    @AppStorage(SettingsKey.copilotQuota) private var requests = 300.0
+
+    private var planMinutes: Double? { store.plan.flatMap { UsageStore.planActionsMinutes[$0] } }
+
+    private func apply() { Task { await store.refresh(notify: false) } }
 
     var body: some View {
         Form {
-            Section {
-                TextField("Included Actions minutes / month", value: $actions, format: .number)
-                Text("Free: 2,000 · Pro: 3,000 · Team: 3,000 · Enterprise: 50,000").font(.caption).foregroundStyle(.secondary)
-            }
-            Section {
-                TextField("Copilot premium requests / month", value: $copilot, format: .number)
-                Text("Copilot Free: 50 · Pro: 300 · Pro+: 1,500").font(.caption).foregroundStyle(.secondary)
-            }
-            Section {
-                Text("GitHub only reports your plan to tokens with the `user` scope, so set your included amounts here.")
+            Section("Actions minutes") {
+                Toggle(planMinutes.map { "Use my plan's allowance (\(store.plan!.capitalized): \(Int($0).formatted()) minutes)" }
+                       ?? "Use my plan's allowance (needs the `user` scope)", isOn: $fromPlan)
+                    .disabled(planMinutes == nil)
+                    .onChange(of: fromPlan) { _, _ in apply() }
+                TextField("Included minutes / month", value: $actions, format: .number)
+                    .disabled(fromPlan && planMinutes != nil)
+                    .onSubmit(apply)
+                Text("Counted the way GitHub does: in standard Linux minutes, where macOS runners use about 10× and Windows 2×, and public repositories are free.")
                     .font(.caption).foregroundStyle(.secondary)
-                Button("Apply") { Task { await store.refresh(notify: false) } }
+            }
+            Section("Copilot") {
+                Picker("Plan", selection: Binding(
+                    get: { credits == 10 ? "pro" : credits == 39 ? "pro+" : "custom" },
+                    set: { v in if v == "pro" { credits = 10 } else if v == "pro+" { credits = 39 }; apply() })) {
+                    Text("Pro ($10 of AI Credits)").tag("pro")
+                    Text("Pro+ ($39 of AI Credits)").tag("pro+")
+                    Text("Custom").tag("custom")
+                }
+                TextField("Included AI Credits ($ / month)", value: $credits, format: .number.precision(.fractionLength(2)))
+                    .onSubmit(apply)
+                TextField("Premium requests / month (annual plans)", value: $requests, format: .number)
+                    .onSubmit(apply)
+                Text("Since June 2026 Copilot bills AI Credits in dollars. Annual plans keep premium requests until they renew; Quotacat shows whichever your account uses.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

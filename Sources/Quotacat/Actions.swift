@@ -64,9 +64,11 @@ struct RepoSummary: Decodable, Hashable {
     let defaultBranch: String
     let pushedAt: String?
     let archived: Bool
+    let isPrivate: Bool
 
     enum CodingKeys: String, CodingKey {
         case archived
+        case isPrivate = "private"
         case fullName = "full_name"
         case defaultBranch = "default_branch"
         case pushedAt = "pushed_at"

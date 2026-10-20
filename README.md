@@ -5,7 +5,7 @@
 <h1 align="center">Quotacat</h1>
 
 <p align="center">
-  Your GitHub quotas in the macOS menu bar: API rate limits, Actions minutes, Copilot premium requests, pull requests waiting on you, and failing GitHub Actions.
+  Your GitHub quotas in the macOS menu bar: API rate limits, Actions minutes, Copilot AI Credits, pull requests waiting on you, and failing GitHub Actions.
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@
 | GraphQL API rate limit | hourly |
 | Search API rate limit | every minute |
 | Actions minutes, by repository | monthly (UTC) |
-| Copilot premium requests, by model | monthly (UTC) |
+| Copilot AI Credits ($), by model; premium requests on annual plans | monthly (UTC) |
 
 Each bar has a **time marker** for how far through the window you are, and a **pace projection**
 that estimates where you'll be at reset: green when comfortable, through orange and red, to purple
@@ -98,15 +98,17 @@ Quotacat reuses your [GitHub CLI](https://cli.github.com) login, so if `gh auth 
 you're done. Alternatively, paste a personal access token in **Settings → Account**; it's stored
 in the macOS Keychain.
 
-Rate limits work with any token. **Actions minutes and Copilot premium requests** come from
+Rate limits work with any token. **Actions minutes and Copilot usage** come from
 GitHub's billing API, which needs the `user` scope:
 
 ```bash
 gh auth refresh -h github.com -s user
 ```
 
-GitHub doesn't tell the app your plan, so set your included Actions minutes and Copilot requests
-in **Settings → Quotas**.
+Actions minutes are counted the way GitHub bills them: in standard Linux minutes, where macOS
+runners use about 10× and Windows 2×, and public repositories are free. With the `user` scope,
+Quotacat reads your plan and uses its included minutes automatically. Set your Copilot plan
+(Pro includes $10 of AI Credits, Pro+ $39) in **Settings → Quotas**.
 
 ## Privacy
 

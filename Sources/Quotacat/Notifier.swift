@@ -37,13 +37,13 @@ final class Notifier {
                     for lower in Self.thresholds where lower <= t {
                         sent.insert("\(m.kind.rawValue)-\(window)-\(Int(lower * 100))")
                     }
-                    post(title: "\(m.kind.title) at \(Int((m.fraction * 100).rounded()))%",
-                         body: "\(UsageMath.formatQuantity(m.used)) of \(UsageMath.formatQuantity(m.limit)) \(m.kind.unit) used. Resets in \(UsageMath.countdown(to: m.resetAt, now: Date())).")
+                    post(title: "\(m.displayTitle) at \(Int((m.fraction * 100).rounded()))%",
+                         body: "\(m.amountText) used. Resets in \(UsageMath.countdown(to: m.resetAt, now: Date())).")
                 }
             }
             if let prev = lastReset[m.kind], m.resetAt.timeIntervalSince(prev) > 60,
                (lastFraction[m.kind] ?? 0) >= Self.thresholds[0] {
-                post(title: "\(m.kind.title) reset", body: "Your \(m.kind.title.lowercased()) allowance is available again.")
+                post(title: "\(m.displayTitle) reset", body: "Your \(m.displayTitle.lowercased()) allowance is available again.")
             }
             lastReset[m.kind] = m.resetAt
             lastFraction[m.kind] = m.fraction

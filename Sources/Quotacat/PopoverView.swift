@@ -272,6 +272,13 @@ struct MetricCard: View {
         }
         .font(.caption).foregroundStyle(.secondary)
         pace
+        noteText
+    }
+
+    @ViewBuilder private var noteText: some View {
+        if let note = metric.note {
+            Text(note).font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     /// Radial layout: a ring gauge with the percentage inside, and the text stacked beside it.
@@ -290,18 +297,19 @@ struct MetricCard: View {
                 quantity.font(.caption).foregroundStyle(.secondary)
                 resets.font(.caption).foregroundStyle(.secondary)
                 pace
+                noteText
             }
             Spacer(minLength: 0)
         }
     }
 
     private var title: some View {
-        Label(metric.kind.title, systemImage: metric.kind.symbol).font(.callout.weight(.medium))
+        Label(metric.displayTitle, systemImage: metric.kind.symbol).font(.callout.weight(.medium))
     }
 
     private var quantity: some View {
         HStack(spacing: 4) {
-            Text("\(UsageMath.formatQuantity(metric.used)) / \(UsageMath.formatQuantity(metric.limit)) \(metric.kind.unit)")
+            Text(metric.amountText)
             if let amt = metric.netAmount, amt > 0 {
                 Text(String(format: "· $%.2f billed", amt))
             }
@@ -335,7 +343,7 @@ struct MetricCard: View {
             HStack {
                 Text(item.label).lineLimit(1).truncationMode(.middle)
                 Spacer()
-                Text(UsageMath.formatQuantity(item.quantity)).monospacedDigit()
+                Text(metric.format(item.quantity)).monospacedDigit()
                 if item.netAmount > 0 { Text(String(format: "$%.2f", item.netAmount)).foregroundStyle(.secondary) }
             }
             .font(.caption)

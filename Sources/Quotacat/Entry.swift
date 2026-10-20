@@ -46,8 +46,8 @@ enum Entry {
                     let pace = UsageMath.projectedFraction(used: m.used, limit: m.limit, start: m.periodStart,
                                                            end: m.resetAt, now: Date())
                         .map { "\(UsageMath.paceTier(projected: $0).title) (\(Int($0 * 100))%)" } ?? "n/a"
-                    let usage = "\(UsageMath.formatQuantity(m.used)) / \(UsageMath.formatQuantity(m.limit))"
-                    print(pad(k.title, 26) + pad(usage, 14) + pad("\(Int((m.fraction * 100).rounded()))%", 6)
+                    let usage = m.amountText + (m.netAmount.map { $0 > 0 ? String(format: " ($%.2f billed)", $0) : "" } ?? "")
+                    print(pad(m.displayTitle, 26) + pad(usage, 30) + pad("\(Int((m.fraction * 100).rounded()))%", 6)
                           + pad("resets in \(UsageMath.countdown(to: m.resetAt, now: Date()))", 20) + "pace: \(pace)")
                 } else if let issue = store.issues[k] {
                     print(pad(k.title, 26) + "unavailable: \(issue)")

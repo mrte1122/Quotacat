@@ -16,6 +16,8 @@ final class UsageStore: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var isRefreshing = false
     @Published private(set) var now = Date()
+    /// GitHub plan name ("free", "pro", …), when the token has the `user` scope.
+    @Published private(set) var plan: String?
     @Published private(set) var pullRequests: PullRequestQueue?
     @Published private(set) var pullRequestIssue: String?
     private var lastPullRequestFetch = Date.distantPast
@@ -113,6 +115,7 @@ final class UsageStore: ObservableObject {
             let user = try await client.fetchUser()
             login = user.login
             scopes = user.scopes
+            plan = user.plan
             let limits = try await client.fetchRateLimits()
 
             var newMetrics: [MetricKind: UsageMetric] = [:]
@@ -130,7 +133,8 @@ final class UsageStore: ObservableObject {
             if let s = user.scopes, !s.contains("user") {
                 for k in MetricKind.billing { newIssues[k] = GitHubError.needsUserScope.localizedDescription }
             } else {
-                let (billing, billingIssues) = await loadBilling(client: client, login: user.login)
+                let (billing, billingIssues) = await loadBilling(client: client, login: user.login,
+                                                                  token: credential.token, plan: user.plan)
                 newMetrics.merge(billing) { $1 }
                 newIssues.merge(billingIssues) { $1 }
             }
@@ -175,7 +179,7 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    private func loadBilling(client: GitHubClient, login: String) async
+    private func loadBilling(client: GitHubClient, login: String, token: String, plan: String?) async
         -> ([MetricKind: UsageMetric], [MetricKind: String])
     {
         let date = Date()
@@ -186,51 +190,110 @@ final class UsageStore: ObservableObject {
         let defaults = UserDefaults.standard
 
         async let usageRequest = client.fetchBillingUsage(user: login, year: year, month: month)
+        async let creditsRequest = client.fetchAICredits(user: login, year: year, month: month)
         async let premiumRequest = client.fetchPremiumRequests(user: login, year: year, month: month)
+        // Public repositories' Actions minutes are free and don't use the plan's allowance.
+        let publicRepos = Set((try? await ensureRepos(token: token))?.filter { !$0.isPrivate }
+            .map { $0.fullName.split(separator: "/").last.map(String.init)?.lowercased() ?? "" } ?? [])
 
         var out: [MetricKind: UsageMetric] = [:]
         var issues: [MetricKind: String] = [:]
-        var copilotDaily: [DailyPoint] = []
+        var usageRows: [BillingItem] = []
 
         do {
-            let usage = try await usageRequest
-            let actions = usage.filter {
-                ($0.product ?? "").lowercased() == "actions" && ($0.unitType ?? "").lowercased() == "minutes"
-            }
-            out[.actions] = UsageMetric(
-                kind: .actions,
-                used: actions.reduce(0) { $0 + ($1.quantity ?? 0) },
-                limit: defaults.double(forKey: SettingsKey.actionsQuota),
-                periodStart: start, resetAt: end,
-                netAmount: actions.reduce(0) { $0 + ($1.netAmount ?? 0) },
-                breakdown: Self.group(actions.map { ($0.repositoryName ?? $0.sku ?? "Other", $0.quantity ?? 0, $0.netAmount ?? 0) }),
-                daily: Self.daily(actions.map { ($0.date, $0.quantity ?? 0) })
-            )
-            copilotDaily = Self.daily(usage
-                .filter { ($0.sku ?? "").lowercased().contains("premium request") }
-                .map { ($0.date, $0.quantity ?? 0) })
+            usageRows = try await usageRequest
+            out[.actions] = Self.actionsMetric(rows: usageRows, publicRepos: publicRepos,
+                                               included: Self.includedActionsMinutes(plan: plan), start: start, end: end)
         } catch {
             issues[.actions] = error.localizedDescription
         }
 
-        do {
-            let items = try await premiumRequest
-            out[.copilot] = UsageMetric(
-                kind: .copilot,
-                used: items.reduce(0) { $0 + ($1.grossQuantity ?? 0) },
-                limit: defaults.double(forKey: SettingsKey.copilotQuota),
-                periodStart: start, resetAt: end,
-                netAmount: items.reduce(0) { $0 + ($1.netAmount ?? 0) },
-                breakdown: Self.group(items.map { ($0.model ?? $0.sku ?? "Other", $0.grossQuantity ?? 0, $0.netAmount ?? 0) }),
-                daily: copilotDaily
-            )
-        } catch {
-            issues[.copilot] = error.localizedDescription
+        let credits = try? await creditsRequest
+        let premium = try? await premiumRequest
+        if credits == nil && premium == nil {
+            issues[.copilot] = GitHubError.notAvailable("Copilot billing data unavailable.").localizedDescription
+        } else {
+            out[.copilot] = Self.copilotMetric(credits: credits ?? [], premium: premium ?? [], usageRows: usageRows,
+                                               includedCredits: defaults.double(forKey: SettingsKey.copilotCredits),
+                                               includedRequests: defaults.double(forKey: SettingsKey.copilotQuota),
+                                               start: start, end: end)
         }
         return (out, issues)
     }
 
-    private static func group(_ rows: [(String, Double, Double)]) -> [BreakdownItem] {
+    /// Included Actions minutes per month by GitHub plan (standard Linux runner minutes).
+    nonisolated static let planActionsMinutes: [String: Double] = ["free": 2000, "pro": 3000, "team": 3000, "enterprise": 50000]
+
+    static func includedActionsMinutes(plan: String?) -> Double {
+        let d = UserDefaults.standard
+        if d.bool(forKey: SettingsKey.actionsQuotaFromPlan), let plan, let minutes = planActionsMinutes[plan] {
+            return minutes
+        }
+        return d.double(forKey: SettingsKey.actionsQuota)
+    }
+
+    /// Actions minutes as GitHub actually counts them against the allowance.
+    ///
+    /// The allowance is in standard Linux minutes; other runners cost more per minute (macOS
+    /// about 10x, Windows about 2x), and public repositories are free. The billing report applies
+    /// the allowance as a dollar discount, so: allowance used = discount on private-repo minutes
+    /// / Linux price. Anything beyond it shows up as the net (billed) amount.
+    nonisolated static func actionsMetric(rows: [BillingItem], publicRepos: Set<String>, included: Double,
+                              start: Date, end: Date) -> UsageMetric {
+        let minutes = rows.filter {
+            ($0.product ?? "").lowercased() == "actions" && ($0.unitType ?? "").lowercased() == "minutes"
+        }
+        let linuxRate = minutes.first { ($0.sku ?? "").lowercased() == "actions linux" }?.pricePerUnit ?? 0.006
+        let counted = minutes.filter { !publicRepos.contains(($0.repositoryName ?? "").lowercased()) }
+        func equivalent(_ r: BillingItem) -> Double { (r.grossAmount ?? 0) / linuxRate }
+        let hasWeighted = counted.contains { ($0.pricePerUnit ?? linuxRate) > linuxRate * 1.01 }
+        return UsageMetric(
+            kind: .actions,
+            used: counted.reduce(0) { $0 + ($1.discountAmount ?? 0) } / linuxRate,
+            limit: included,
+            periodStart: start, resetAt: end,
+            netAmount: minutes.reduce(0) { $0 + ($1.netAmount ?? 0) },
+            breakdown: group(counted.map { ($0.repositoryName ?? $0.sku ?? "Other", equivalent($0), $0.netAmount ?? 0) }),
+            daily: daily(counted.map { ($0.date, equivalent($0)) }),
+            note: hasWeighted ? "Counted as Linux minutes: macOS runners use about 10×, Windows 2×. Public repos are free." : nil)
+    }
+
+    /// Copilot since June 2026 bills AI Credits in dollars. Annual plans keep premium requests until
+    /// renewal, so fall back to those when there's request usage but no credit usage.
+    nonisolated static func copilotMetric(credits: [PremiumItem], premium: [PremiumItem], usageRows: [BillingItem],
+                              includedCredits: Double, includedRequests: Double,
+                              start: Date, end: Date) -> UsageMetric {
+        let premiumUsed = premium.reduce(0) { $0 + ($1.grossQuantity ?? 0) }
+        if credits.isEmpty && premiumUsed > 0 {
+            return UsageMetric(
+                kind: .copilot, used: premiumUsed, limit: includedRequests, periodStart: start, resetAt: end,
+                netAmount: premium.reduce(0) { $0 + ($1.netAmount ?? 0) },
+                breakdown: group(premium.map { ($0.model ?? $0.sku ?? "Other", $0.grossQuantity ?? 0, $0.netAmount ?? 0) }),
+                title: "Copilot Premium Requests")
+        }
+        let copilotRows = usageRows.filter { ($0.product ?? "").lowercased() == "copilot" }
+        return UsageMetric(
+            kind: .copilot,
+            used: credits.reduce(0) { $0 + ($1.grossAmount ?? 0) },
+            limit: includedCredits,
+            periodStart: start, resetAt: end,
+            netAmount: credits.reduce(0) { $0 + ($1.netAmount ?? 0) },
+            breakdown: group(credits.map { ($0.model ?? $0.sku ?? "Other", $0.grossAmount ?? 0, $0.netAmount ?? 0) }),
+            daily: daily(copilotRows.map { ($0.date, $0.grossAmount ?? 0) }),
+            isCurrency: true)
+    }
+
+    /// The repository list (shared with the Actions tab), refreshed every 30 minutes.
+    private func ensureRepos(token: String) async throws -> [RepoSummary] {
+        if repoCache.isEmpty || Date().timeIntervalSince(lastRepoFetch) > 1800 {
+            repoCache = try await actionsFetcher.repositories(token: token)
+            lastRepoFetch = Date()
+            availableRepos = repoCache.filter { !$0.archived }.map(\.fullName).sorted { $0.lowercased() < $1.lowercased() }
+        }
+        return repoCache
+    }
+
+    private nonisolated static func group(_ rows: [(String, Double, Double)]) -> [BreakdownItem] {
         var totals: [String: (Double, Double)] = [:]
         for (label, q, amt) in rows {
             let t = totals[label] ?? (0, 0)
@@ -241,7 +304,7 @@ final class UsageStore: ObservableObject {
             .sorted { $0.quantity > $1.quantity }
     }
 
-    private static func daily(_ rows: [(String?, Double)]) -> [DailyPoint] {
+    private nonisolated static func daily(_ rows: [(String?, Double)]) -> [DailyPoint] {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
         let iso = ISO8601DateFormatter()
@@ -264,11 +327,7 @@ final class UsageStore: ObservableObject {
     }
 
     private func loadActions(token: String) async throws -> ActionsStatus {
-        if repoCache.isEmpty || Date().timeIntervalSince(lastRepoFetch) > 1800 {
-            repoCache = try await actionsFetcher.repositories(token: token)
-            lastRepoFetch = Date()
-            availableRepos = repoCache.filter { !$0.archived }.map(\.fullName).sorted { $0.lowercased() < $1.lowercased() }
-        }
+        _ = try await ensureRepos(token: token)
         let watched = Self.watchedRepos(from: repoCache, now: Date())
         let fetcher = actionsFetcher
         let failing = await withTaskGroup(of: [FailingWorkflow].self) { group in
@@ -313,13 +372,15 @@ final class UsageStore: ObservableObject {
             .core: window(.core, 3120, 5000, 22 * 60, 3600),
             .graphql: window(.graphql, 410, 5000, 41 * 60, 3600),
             .search: window(.search, 4, 30, 40, 60),
-            .actions: UsageMetric(kind: .actions, used: 1240, limit: 2000, periodStart: start, resetAt: end, netAmount: 0,
+            .actions: UsageMetric(kind: .actions, used: 1860, limit: 3000, periodStart: start, resetAt: end, netAmount: 0,
                                   breakdown: [.init(label: "you/web-app", quantity: 820, netAmount: 0),
                                               .init(label: "you/cli-tool", quantity: 420, netAmount: 0)],
-                                  daily: days),
-            .copilot: UsageMetric(kind: .copilot, used: 212, limit: 300, periodStart: start, resetAt: end, netAmount: 0,
-                                  breakdown: [.init(label: "Claude Sonnet", quantity: 150, netAmount: 0),
-                                              .init(label: "GPT-5", quantity: 62, netAmount: 0)]),
+                                  daily: days,
+                                  note: "Counted as Linux minutes: macOS runners use about 10×, Windows 2×. Public repos are free."),
+            .copilot: UsageMetric(kind: .copilot, used: 7.12, limit: 10, periodStart: start, resetAt: end, netAmount: 0,
+                                  breakdown: [.init(label: "Claude Sonnet", quantity: 5.04, netAmount: 0),
+                                              .init(label: "GPT-5", quantity: 2.08, netAmount: 0)],
+                                  isCurrency: true),
         ]
         issues = [:]
         login = "you"

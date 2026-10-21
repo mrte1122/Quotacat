@@ -8,6 +8,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let store = UsageStore()
     let updater = Updater()
+    let signIn = GitHubSignIn()
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
     private var settingsWindow: NSWindow?
@@ -19,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.action = #selector(togglePopover)
         statusItem.button?.imagePosition = .imageOnly
 
-        let host = NSHostingController(rootView: PopoverView(store: store, updater: updater) { [weak self] in self?.openSettings() })
+        let host = NSHostingController(rootView: PopoverView(store: store, updater: updater, signIn: signIn) { [weak self] in self?.openSettings() })
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
         popover.behavior = .transient
@@ -39,6 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             store.notifier.requestAuthorization()
         }
         updateIcon()
+        signIn.onSignedIn = { [weak self] in
+            Task { await self?.store.refresh(notify: false, forceActivity: true) }
+        }
         store.start()
         updater.notifier = store.notifier
         updater.start()
@@ -75,7 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func openSettings() {
         popover.performClose(nil)
         if settingsWindow == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(store: store, updater: updater)))
+            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(store: store, updater: updater, signIn: signIn)))
             w.title = "Quotacat Settings"
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false

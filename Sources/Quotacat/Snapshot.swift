@@ -11,7 +11,9 @@ enum Snapshot {
         let dir = URL(fileURLWithPath: outDir)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         Task { @MainActor in
-            if CommandLine.arguments.contains("--demo") {
+            if CommandLine.arguments.contains("--signed-out") {
+                store.previewSignedOut()
+            } else if CommandLine.arguments.contains("--demo") {
                 store.loadDemo()
             } else {
                 await store.refresh(notify: false)
@@ -41,7 +43,7 @@ enum Snapshot {
             for (name, appearanceName, radial, tab) in variants {
                 d.set(radial, forKey: SettingsKey.radialMeters)
                 d.set(tab, forKey: SettingsKey.popoverTab)
-                let view = PopoverView(store: store, updater: Updater(), openSettings: {})
+                let view = PopoverView(store: store, updater: Updater(), signIn: GitHubSignIn(), openSettings: {})
                     .background(Color(nsColor: .windowBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 let host = NSHostingView(rootView: view)

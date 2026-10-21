@@ -4,6 +4,7 @@ import SwiftUI
 struct PopoverView: View {
     @ObservedObject var store: UsageStore
     @ObservedObject var updater: Updater
+    @ObservedObject var signIn: GitHubSignIn
     var openSettings: () -> Void
 
     @AppStorage(SettingsKey.paceColoring) private var paceColoring = true
@@ -37,21 +38,25 @@ struct PopoverView: View {
             locationBanner
             updateBanner
             banner
-            if tabs.count > 1 {
-                Picker("View", selection: $tab) {
-                    ForEach(tabs, id: \.tag) { Text($0.title).tag($0.tag) }
+            if store.needsSignIn {
+                SignInCard(signIn: signIn)
+            } else {
+                if tabs.count > 1 {
+                    Picker("View", selection: $tab) {
+                        ForEach(tabs, id: \.tag) { Text($0.title).tag($0.tag) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
-            switch currentTab {
-            case "pulls":
-                PullRequestsView(queue: store.pullRequests, issue: store.pullRequestIssue, now: store.now)
-            case "actions":
-                ActionsView(status: store.actions, issue: store.actionsIssue, now: store.now, openSettings: openSettings)
-            default:
-                section("API rate limits", kinds: MetricKind.rateLimits)
-                section("This month", kinds: MetricKind.billing)
+                switch currentTab {
+                case "pulls":
+                    PullRequestsView(queue: store.pullRequests, issue: store.pullRequestIssue, now: store.now)
+                case "actions":
+                    ActionsView(status: store.actions, issue: store.actionsIssue, now: store.now, openSettings: openSettings)
+                default:
+                    section("API rate limits", kinds: MetricKind.rateLimits)
+                    section("This month", kinds: MetricKind.billing)
+                }
             }
             Divider()
             footer
@@ -425,6 +430,57 @@ struct TwoStageBar: View {
             Capsule().fill(color).frame(width: fraction > 0 ? max(6, width * min(1, fraction)) : 0)
         }
         .frame(width: width)
+    }
+}
+
+/// First-run / signed-out card: "Sign in with GitHub" via the device flow.
+struct SignInCard: View {
+    @ObservedObject var signIn: GitHubSignIn
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            switch signIn.state {
+            case .waiting(let code, _, _):
+                Text("Enter this code on GitHub").font(.callout.weight(.medium))
+                Text(code)
+                    .font(.system(size: 26, weight: .semibold, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
+                Button("Copy Code and Open GitHub") { signIn.copyCodeAndOpenGitHub() }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Waiting for you to approve on github.com…").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Cancel") { signIn.cancel() }.buttonStyle(.borderless).font(.caption)
+                }
+            case .requesting:
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Contacting GitHub…").font(.callout)
+                }
+            case .idle, .failed:
+                Label("Connect your GitHub account", systemImage: "person.crop.circle.badge.plus")
+                    .font(.callout.weight(.semibold))
+                Text("Quotacat reads your rate limits, Actions and Copilot usage, pull requests and workflow runs. Your token stays in this Mac's Keychain and is only sent to GitHub.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if case .failed(let message) = signIn.state {
+                    Text(message).font(.caption).foregroundStyle(.red)
+                }
+                Button("Sign in with GitHub") { signIn.start() }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
+                Text("Already use the GitHub CLI? Run `gh auth login` and Quotacat picks it up automatically.")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 

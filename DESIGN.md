@@ -94,12 +94,16 @@ arrive while Quotacat is running notify. Counts are also written to the shell ca
 
 ## Credentials
 
-1. The GitHub CLI login, via `gh auth token`. GUI apps don't inherit your shell `PATH`, so the
+1. **Sign in with GitHub** (OAuth device flow, Client ID `Ov23liLGpWaXO0bDBU3S`, scopes
+   `repo user read:org`). No client secret exists in the app. The token is stored in the Keychain
+   (`Quotacat` / `github-sign-in`). If GitHub later rejects it (revoked), it's deleted and the
+   sign-in card comes back.
+2. The GitHub CLI login, via `gh auth token`. GUI apps don't inherit your shell `PATH`, so the
    usual install locations are probed directly.
-2. A personal access token saved in the macOS Keychain from Settings → Account.
+3. A personal access token saved in the Keychain from Settings → Account.
 
-The token is only sent to `api.github.com`. Quotacat has no telemetry or analytics. The only request it makes beyond your own API calls is the
-anonymous daily update check described below.
+The token is only sent to `api.github.com`. Quotacat has no telemetry or analytics. The only request
+it makes beyond your own API calls is the anonymous daily update check described below.
 
 ## Updates
 

@@ -94,16 +94,19 @@ open ~/Applications/Quotacat.app
 
 ## Sign in
 
-Quotacat reuses your [GitHub CLI](https://cli.github.com) login, so if `gh auth status` works,
-you're done. Alternatively, paste a personal access token in **Settings → Account**; it's stored
-in the macOS Keychain.
+Open Quotacat and click **Sign in with GitHub**. You'll get a short code: enter it at
+github.com/login/device and click **Authorize Quotacat**. The token is saved in your Mac's
+Keychain and only ever sent to GitHub. Quotacat asks for `repo` (private repos' pull requests and
+workflow runs), `user` (billing usage and your plan) and `read:org`.
 
-Rate limits work with any token. **Actions minutes and Copilot usage** come from
-GitHub's billing API, which needs the `user` scope:
+Already use the [GitHub CLI](https://cli.github.com)? Quotacat picks up your `gh` login
+automatically. For billing data, that login needs the `user` scope:
 
 ```bash
 gh auth refresh -h github.com -s user
 ```
+
+You can also paste a personal access token in **Settings → Account**.
 
 Actions minutes are counted the way GitHub bills them: in standard Linux minutes, where macOS
 runners use about 10× and Windows 2×, and public repositories are free. With the `user` scope,
@@ -139,6 +142,7 @@ jq -r '.metrics[] | select(.kind=="core") | "gh \(.percent)%"' \
 Q=~/Applications/Quotacat.app/Contents/MacOS/Quotacat
 $Q --selftest                 # run the pace and countdown math checks
 $Q --once                     # fetch once and print a summary (never prints your token)
+$Q --sign-in                  # Sign in with GitHub from the terminal
 $Q --snapshot DIR [--demo]    # render the popover and icons to PNGs; --demo uses sample data
 $Q --launch-at-login on|off   # same as the Settings toggle
 $Q --check-update             # print the latest release version

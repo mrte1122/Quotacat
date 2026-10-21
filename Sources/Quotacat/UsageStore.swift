@@ -16,6 +16,8 @@ final class UsageStore: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var isRefreshing = false
     @Published private(set) var now = Date()
+    /// No usable credentials (or GitHub rejected them): the popover shows the sign-in card.
+    @Published private(set) var needsSignIn = false
     /// GitHub plan name ("free", "pro", …), when the token has the `user` scope.
     @Published private(set) var plan: String?
     @Published private(set) var pullRequests: PullRequestQueue?
@@ -104,11 +106,12 @@ final class UsageStore: ObservableObject {
         let credential = await Task.detached { CredentialProvider.resolve(preferPAT: preferPAT) }.value
         guard let credential else {
             tokenSource = nil
-            consecutiveFailures += 1
-            lastError = "No GitHub credentials. Run `gh auth login`, or add a token in Settings → Account."
+            needsSignIn = true
+            lastError = nil
             return
         }
         tokenSource = credential.source
+        needsSignIn = false
         let client = GitHubClient(token: credential.token)
 
         do {
@@ -173,6 +176,11 @@ final class UsageStore: ObservableObject {
             lastError = nil
             if notify { notifier.evaluate(Array(newMetrics.values)) }
             writeCache()
+        } catch GitHubError.unauthorized where credential.source == .signIn {
+            // The sign-in token was revoked on GitHub: forget it and ask again.
+            Keychain.delete(.signIn)
+            needsSignIn = true
+            lastError = nil
         } catch {
             consecutiveFailures += 1
             lastError = error.localizedDescription
@@ -402,6 +410,9 @@ final class UsageStore: ObservableObject {
         let cutoff = now.addingTimeInterval(-30 * 86_400)
         return Array(live.filter { ($0.pushedAt.flatMap(iso.date(from:)) ?? .distantPast) >= cutoff }.prefix(recentRepoLimit))
     }
+
+    /// For `--snapshot --signed-out`: render the first-run sign-in card.
+    func previewSignedOut() { needsSignIn = true }
 
     /// Sample data for README screenshots (`--snapshot DIR --demo`), so no real account data is published.
     func loadDemo() {

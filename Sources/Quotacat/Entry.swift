@@ -5,11 +5,13 @@ import ServiceManagement
 enum Entry {
     @MainActor
     static func main() {
+        setvbuf(stdout, nil, _IOLBF, 0)   // line-buffered, so CLI modes print immediately even when piped
         SettingsKey.registerDefaults()
         let args = CommandLine.arguments
 
         if args.contains("--selftest") { exit(SelfTest.run()) }
         if args.contains("--once") { runOnce() }
+        if args.contains("--sign-in") { runSignIn() }
         if args.contains("--check-update") || args.contains("--update") {
             runUpdate(install: args.contains("--update"))
         }
@@ -76,6 +78,35 @@ enum Entry {
             }
             print("cache:", UsageStore.cacheURL.path)
             exit(store.lastError == nil ? 0 : 1)
+        }
+        RunLoop.main.run()
+        exit(0)
+    }
+
+    /// `--sign-in` runs the device flow in the terminal (same code path as the button).
+    @MainActor
+    private static func runSignIn() -> Never {
+        _ = NSApplication.shared
+        let signIn = GitHubSignIn()
+        signIn.start()
+        Task { @MainActor in
+            var shown = false
+            while true {
+                switch signIn.state {
+                case .waiting(let code, let url, _) where !shown:
+                    print("Open \(url.absoluteString) and enter: \(code)")
+                    shown = true
+                case .failed(let message):
+                    print("error:", message); exit(1)
+                case .idle where signIn.isSignedIn:
+                    if let token = Keychain.load(.signIn), let user = try? await GitHubClient(token: token).fetchUser() {
+                        print("signed in as @\(user.login) | scopes: \(user.scopes?.sorted().joined(separator: ",") ?? "n/a") | plan: \(user.plan ?? "n/a")")
+                    }
+                    exit(0)
+                default: break
+                }
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
         }
         RunLoop.main.run()
         exit(0)

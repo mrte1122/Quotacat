@@ -4,13 +4,14 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var store: UsageStore
     @ObservedObject var updater: Updater
+    @ObservedObject var signIn: GitHubSignIn
 
     var body: some View {
         TabView {
             GeneralSettings(store: store, updater: updater).tabItem { Label("General", systemImage: "gearshape") }
             ActivitySettings(store: store).tabItem { Label("Activity", systemImage: "bell.badge") }
             AppearanceSettings().tabItem { Label("Appearance", systemImage: "menubar.rectangle") }
-            AccountSettings(store: store).tabItem { Label("Account", systemImage: "person.crop.circle") }
+            AccountSettings(store: store, signIn: signIn).tabItem { Label("Account", systemImage: "person.crop.circle") }
             QuotaSettings(store: store).tabItem { Label("Quotas", systemImage: "gauge.with.dots.needle.50percent") }
         }
         .padding(16)
@@ -242,6 +243,7 @@ private struct MenuBarToggle: View {
 
 private struct AccountSettings: View {
     @ObservedObject var store: UsageStore
+    @ObservedObject var signIn: GitHubSignIn
     @AppStorage(SettingsKey.preferPAT) private var preferPAT = false
     @State private var token = ""
     @State private var hasStoredToken = Keychain.loadToken() != nil
@@ -255,8 +257,24 @@ private struct AccountSettings: View {
                 LabeledContent("Token scopes", value: store.scopes.map { $0.sorted().joined(separator: ", ") } ?? "Not reported (fine-grained token)")
                 LabeledContent("GitHub CLI", value: CredentialProvider.ghPath ?? "Not found")
             }
+            Section("GitHub sign-in") {
+                if signIn.isSignedIn {
+                    HStack {
+                        Label("Signed in with GitHub", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                        Spacer()
+                        Button("Sign Out") {
+                            signIn.signOut()
+                            Task { await store.refresh(notify: false) }
+                        }
+                    }
+                    Text("Signing out removes the token from this Mac. To revoke Quotacat's access entirely, visit github.com/settings/applications.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    SignInCard(signIn: signIn)
+                }
+            }
             Section("Billing access") {
-                Text("Actions minutes and Copilot premium requests need the `user` scope. To add it to your GitHub CLI login, run:")
+                Text("Billing data (Actions minutes, Copilot) needs the `user` scope. Signing in with GitHub includes it. If you use the GitHub CLI instead, add it with:")
                     .font(.caption)
                 HStack {
                     Text(IssueRow.scopeCommand).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
@@ -285,7 +303,7 @@ private struct AccountSettings: View {
                     }
                     .disabled(!hasStoredToken)
                     Spacer()
-                    Link("Create token", destination: URL(string: "https://github.com/settings/tokens/new?scopes=user&description=GitHub%20Usage%20Monitor")!)
+                    Link("Create token", destination: URL(string: "https://github.com/settings/tokens/new?scopes=user&description=Quotacat")!)
                 }
                 Toggle("Prefer this token over the GitHub CLI login", isOn: $preferPAT)
                     .onChange(of: preferPAT) { _, _ in Task { await store.refresh(notify: false) } }

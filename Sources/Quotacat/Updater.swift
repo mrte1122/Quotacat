@@ -81,6 +81,7 @@ final class Updater: ObservableObject {
 
     /// One check shortly after launch, then at most once a day.
     func start() {
+        guard !Demo.isActive else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
             Task { @MainActor in await self?.automaticCheck(force: true) }
         }

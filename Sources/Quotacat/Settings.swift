@@ -39,6 +39,12 @@ enum IconStyle: String, CaseIterable, Identifiable {
     }
 }
 
+/// `--demo`: show sample data (the README screenshots' data) instead of your account.
+/// No network calls, no notifications, no update checks; for screen recordings and demos.
+enum Demo {
+    static let isActive = CommandLine.arguments.contains("--demo")
+}
+
 enum SettingsKey {
     static let refreshInterval = "refreshInterval"        // seconds, 10...300
     static let iconStyle = "iconStyle"

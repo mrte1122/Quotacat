@@ -47,6 +47,14 @@ final class UsageStore: ObservableObject {
     var hasData: Bool { !metrics.isEmpty }
 
     func start() {
+        if Demo.isActive {
+            loadDemo()
+            // Re-stamp the sample data so the header keeps saying "updated just now".
+            clockTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.loadDemo() }
+            }
+            return
+        }
         rescheduleIfNeeded()
         clockTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.now = Date() }
@@ -98,6 +106,14 @@ final class UsageStore: ObservableObject {
 
     func refresh(notify: Bool = true, forceActivity: Bool = false) async {
         guard !isRefreshing else { return }
+        if Demo.isActive {
+            // Keep the sample data; just flash the spinner so the refresh button still feels alive.
+            isRefreshing = true
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            loadDemo()
+            isRefreshing = false
+            return
+        }
         isRefreshing = true
         lastRefreshStart = Date()
         defer { isRefreshing = false; now = Date() }

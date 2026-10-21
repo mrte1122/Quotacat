@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/menubar-dark.png" height="28" alt="Menu bar icon">
+  <img src="docs/demo.gif" width="440" alt="Quotacat demo: menu bar, quotas, pull requests and failing workflows">
 </p>
 
 <p align="center">

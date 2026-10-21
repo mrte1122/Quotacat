@@ -34,7 +34,7 @@ func text(_ s: String, size: CGFloat, weight: NSFont.Weight, alpha: CGFloat = 1,
 // Left column: icon, name, pitch.
 icon.draw(in: NSRect(x: 72, y: H - 72 - 150, width: 150, height: 150))
 text("Quotacat", size: 76, weight: .bold, at: NSPoint(x: 236, y: H - 104))
-text("Know before GitHub bills you.", size: 40, weight: .semibold, at: NSPoint(x: 84, y: H - 270))
+text("Your GitHub quotas, at a glance.", size: 40, weight: .semibold, at: NSPoint(x: 84, y: H - 270))
 text("Actions minutes (macOS counts 10×), Copilot AI Credits, API rate limits, pull requests and failing workflows, in your Mac's menu bar.",
      size: 25, weight: .regular, alpha: 0.78, at: NSPoint(x: 84, y: H - 340), width: 620)
 text("Free and open source  ·  Notarized  ·  github.com/mrte1122/Quotacat", size: 20, weight: .medium, alpha: 0.6,

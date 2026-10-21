@@ -68,6 +68,14 @@ Also included:
 **[⬇ Download Quotacat for macOS](https://github.com/mrte1122/Quotacat/releases/latest/download/Quotacat.zip)**
 (macOS 14 or later, Apple silicon and Intel)
 
+Or with [Homebrew](https://brew.sh):
+
+```bash
+brew install --cask mrte1122/tap/quotacat
+```
+
+From the download:
+
 1. Unzip it and drag **Quotacat.app** into **Applications**.
 2. Open it, and look for the gauges in your menu bar. Quotacat has no Dock icon.
 

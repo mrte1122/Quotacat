@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or help
+    url: https://github.com/mrte1122/Quotacat/discussions/new?category=q-a
+    about: Ask in Discussions → Q&A
+  - name: Feature idea
+    url: https://github.com/mrte1122/Quotacat/discussions/new?category=ideas
+    about: Suggest an idea in Discussions → Ideas

@@ -40,4 +40,19 @@ if [[ -n "$NOTES" ]]; then
 else
     gh release create "v$VERSION" build/Quotacat.zip build/Quotacat.zip.sig --title "Quotacat $VERSION" --generate-notes
 fi
+# Point the Homebrew cask (github.com/mrte1122/homebrew-tap) at the new release.
+# Non-fatal: the release itself is already published.
+SHA="$(shasum -a 256 build/Quotacat.zip | awk '{print $1}')"
+TAP="$(mktemp -d)"
+if gh repo clone mrte1122/homebrew-tap "$TAP" -- -q 2>/dev/null \
+   && sed -i '' -e "s/^  version \".*\"/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" "$TAP/Casks/quotacat.rb" \
+   && git -C "$TAP" -c user.name="Tyler Lovelady" -c user.email="24609723+mrte1122@users.noreply.github.com" \
+        commit -qam "Update Quotacat to $VERSION" \
+   && git -C "$TAP" push -q; then
+    echo "Homebrew cask updated to $VERSION"
+else
+    echo "warning: couldn't update the Homebrew cask; edit Casks/quotacat.rb in mrte1122/homebrew-tap by hand" >&2
+fi
+rm -rf "$TAP"
+
 echo "Released v$VERSION"

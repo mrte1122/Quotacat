@@ -37,9 +37,11 @@ mkdir -p build
 # Build each architecture separately and merge with lipo; a single multi-arch
 # `swift build` needs full Xcode, while this works with the Command Line Tools.
 BINS=()
+# Separate scratch paths per architecture: newer SwiftPM (Xcode 27+) otherwise writes both
+# builds to the same .build/out folder and the second overwrites the first.
 for arch in arm64 x86_64; do
-    swift build -c release --arch "$arch"
-    BINS+=("$(swift build -c release --arch "$arch" --show-bin-path)/Quotacat")
+    swift build -c release --arch "$arch" --scratch-path ".build/$arch"
+    BINS+=("$(swift build -c release --arch "$arch" --scratch-path ".build/$arch" --show-bin-path)/Quotacat")
 done
 
 rm -rf "$STAGE"

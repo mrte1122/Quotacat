@@ -31,24 +31,30 @@ func text(_ s: String, size: CGFloat, weight: NSFont.Weight, alpha: CGFloat = 1,
                          options: .usesLineFragmentOrigin, attributes: attrs)
 }
 
-// Left column: icon, name, pitch.
-icon.draw(in: NSRect(x: 72, y: H - 72 - 150, width: 150, height: 150))
-text("Quotacat", size: 76, weight: .bold, at: NSPoint(x: 236, y: H - 104))
-text("Your GitHub quotas, at a glance.", size: 40, weight: .semibold, at: NSPoint(x: 84, y: H - 270))
-text("Actions minutes (macOS counts 10×), Copilot AI Credits, API rate limits, pull requests and failing workflows, in your Mac's menu bar.",
-     size: 25, weight: .regular, alpha: 0.78, at: NSPoint(x: 84, y: H - 340), width: 620)
-text("Free and open source  ·  Notarized  ·  github.com/mrte1122/Quotacat", size: 20, weight: .medium, alpha: 0.6,
-     at: NSPoint(x: 84, y: 92), width: 700)
+// GitHub's repo-card template: keep everything important 80 px in from every edge (it gets
+// cropped differently depending on where the link is shared). Only the background bleeds.
+let safe = NSRect(x: 80, y: 80, width: W - 160, height: H - 160)
 
-// Right: the popover, with a soft shadow.
-let shotH: CGFloat = 600
-let shotW = shot.size.width / shot.size.height * shotH
-let frame = NSRect(x: W - shotW - 70, y: (H - shotH) / 2, width: shotW, height: shotH)
+// Right: the top of the popover (tabs, rate limits, Actions budget), with a soft shadow.
+let crop = NSRect(x: 0, y: shot.size.height * 0.2409, width: shot.size.width, height: shot.size.height * (1 - 0.2409))
+let shotH = safe.height
+let shotW = crop.width / crop.height * shotH
+let frame = NSRect(x: safe.maxX - shotW, y: safe.minY, width: shotW, height: shotH)
 NSGraphicsContext.saveGraphicsState()
-let shadow = NSShadow(); shadow.shadowBlurRadius = 30; shadow.shadowOffset = NSSize(width: 0, height: -10)
+let shadow = NSShadow(); shadow.shadowBlurRadius = 24; shadow.shadowOffset = NSSize(width: 0, height: -8)
 shadow.shadowColor = NSColor.black.withAlphaComponent(0.5); shadow.set()
-shot.draw(in: frame)
+shot.draw(in: frame, from: crop, operation: .sourceOver, fraction: 1)
 NSGraphicsContext.restoreGraphicsState()
+
+// Left column: icon and name, pitch, footer, all inside the safe area.
+let textWidth = frame.minX - safe.minX - 40
+icon.draw(in: NSRect(x: safe.minX, y: safe.maxY - 120, width: 120, height: 120))
+text("Quotacat", size: 68, weight: .bold, at: NSPoint(x: safe.minX + 140, y: safe.maxY - 18))
+text("Your GitHub quotas, at a glance.", size: 38, weight: .semibold, at: NSPoint(x: safe.minX, y: safe.maxY - 160), width: textWidth)
+text("Actions minutes (macOS counts 10×), Copilot AI Credits, API rate limits, pull requests and failing workflows, in your Mac's menu bar.",
+     size: 24, weight: .regular, alpha: 0.78, at: NSPoint(x: safe.minX, y: safe.maxY - 225), width: textWidth)
+text("Free and open source  ·  Notarized  ·  github.com/mrte1122/Quotacat", size: 19, weight: .medium, alpha: 0.6,
+     at: NSPoint(x: safe.minX, y: safe.minY + 26), width: textWidth)
 
 NSGraphicsContext.restoreGraphicsState()
 let out = root.appendingPathComponent("docs/social-preview.png")

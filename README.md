@@ -19,17 +19,28 @@
   <img src="docs/demo.gif" width="440" alt="Quotacat demo: menu bar, quotas, pull requests and failing workflows">
 </p>
 
-<p align="center">
-  <img src="docs/popover-dark.png" width="360" alt="Quotacat popover in dark mode">
-  &nbsp;
-  <img src="docs/popover-light.png" width="360" alt="Quotacat popover in light mode">
-</p>
-
-<p align="center">
-  <img src="docs/popover-pulls-light.png" width="360" alt="Pull requests tab">
-  &nbsp;
-  <img src="docs/popover-actions-dark.png" width="360" alt="Actions tab">
-</p>
+<table align="center">
+  <tr>
+    <th>Quotas</th>
+    <th>Pull requests</th>
+    <th>Actions</th>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="docs/popover-dark.png" width="260" alt="Quotas tab"><br><sub>Rate limits, Actions minutes with your budget, Copilot AI Credits</sub></td>
+    <td align="center" valign="top"><img src="docs/popover-pulls-dark.png" width="260" alt="Pull requests tab"><br><sub>Reviews waiting on you, oldest first, and your open PRs</sub></td>
+    <td align="center" valign="top"><img src="docs/popover-actions-dark.png" width="260" alt="Actions tab"><br><sub>Workflows failing on each repo's default branch</sub></td>
+  </tr>
+  <tr>
+    <th>Light theme</th>
+    <th>Radial meters</th>
+    <th>Menu bar</th>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="docs/popover-light.png" width="260" alt="Light theme"><br><sub>Follows your Mac, or pick Light or Dark</sub></td>
+    <td align="center" valign="top"><img src="docs/popover-radial-light.png" width="260" alt="Radial meters"><br><sub>Rings instead of bars, in the popover and menu bar</sub></td>
+    <td align="center" valign="top"><img src="docs/menubar-dark.png" width="260" alt="Menu bar, dark"><br><br><img src="docs/menubar-light.png" width="260" alt="Menu bar, light"><br><sub>Meters plus badges for reviews waiting (3) and failing workflows (2)</sub></td>
+  </tr>
+</table>
 
 ## What it shows
 

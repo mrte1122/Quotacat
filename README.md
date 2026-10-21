@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/mrte1122/Quotacat/actions/workflows/build.yml"><img src="https://github.com/mrte1122/Quotacat/actions/workflows/build.yml/badge.svg" alt="Build"></a>
   <a href="https://ko-fi.com/mrte90"><img src="https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white" alt="Support on Ko-fi"></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-blue" alt="macOS 14+">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">

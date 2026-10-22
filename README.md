@@ -16,6 +16,16 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/mrte1122/Quotacat/releases/latest/download/Quotacat.zip"><b>⬇ Download</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/mrte1122/Quotacat/wiki"><b>📖 Wiki</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/mrte1122/Quotacat/wiki/FAQ"><b>FAQ</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/mrte1122/Quotacat/wiki/Troubleshooting"><b>Troubleshooting</b></a>
+</p>
+
+<p align="center">
   <img src="docs/demo.gif" width="440" alt="Quotacat demo: menu bar, quotas, pull requests and failing workflows">
 </p>
 
@@ -183,6 +193,18 @@ Then, only when you have changes to ship, use a new version number and a real de
 
 `release.sh` bumps `VERSION`, builds the universal app, signs it with your Developer ID, has Apple
 notarize it, signs `Quotacat.zip` for the updater, tags, pushes, and creates the GitHub release.
+
+## Documentation
+
+The **[Quotacat Wiki](https://github.com/mrte1122/Quotacat/wiki)** has the full guide:
+[installation](https://github.com/mrte1122/Quotacat/wiki/Installation),
+[signing in](https://github.com/mrte1122/Quotacat/wiki/Signing-In),
+[how Actions minutes and budgets are counted](https://github.com/mrte1122/Quotacat/wiki/Actions-Minutes-and-Budgets),
+[how-to guides](https://github.com/mrte1122/Quotacat/wiki/How-To-Guides),
+[shell prompt integration](https://github.com/mrte1122/Quotacat/wiki/Shell-Prompt-Integration),
+a [settings reference](https://github.com/mrte1122/Quotacat/wiki/Settings-Reference),
+the [FAQ](https://github.com/mrte1122/Quotacat/wiki/FAQ), and
+[troubleshooting](https://github.com/mrte1122/Quotacat/wiki/Troubleshooting).
 
 ## Design
 

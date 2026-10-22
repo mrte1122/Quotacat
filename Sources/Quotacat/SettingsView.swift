@@ -23,6 +23,7 @@ private struct GeneralSettings: View {
     @ObservedObject var store: UsageStore
     @ObservedObject var updater: Updater
     @AppStorage(SettingsKey.autoUpdateCheck) private var autoUpdate = true
+    @State private var diagnosticsCopied = false
     @AppStorage(SettingsKey.refreshInterval) private var interval = 60.0
     @AppStorage(SettingsKey.notificationsEnabled) private var notifications = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -94,6 +95,19 @@ private struct GeneralSettings: View {
                     }
                 }
                 Text("Quotacat is free and open source. If it saves you a surprise bill, a tip is appreciated.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Feedback") {
+                HStack {
+                    Button("Report a Bug…") { Feedback.reportBug(store: store) }
+                    Button("Suggest a Feature…") { Feedback.suggestFeature() }
+                    Spacer()
+                    Button(diagnosticsCopied ? "Copied" : "Copy Diagnostics") {
+                        Feedback.copyDiagnostics(store: store)
+                        diagnosticsCopied = true
+                    }
+                }
+                Text("Report a Bug opens GitHub's bug form with your Quotacat version, macOS version and diagnostics filled in. Diagnostics never include your token. Review the form before you submit it.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -264,7 +278,7 @@ private struct AccountSettings: View {
                         Spacer()
                         Button("Sign Out") {
                             signIn.signOut()
-                            Task { await store.refresh(notify: false) }
+                            Task { await store.refresh(notify: false, forceActivity: true) }
                         }
                     }
                     Text("Signing out removes the token from this Mac. To revoke Quotacat's access entirely, visit github.com/settings/applications.")
@@ -293,20 +307,20 @@ private struct AccountSettings: View {
                         Keychain.saveToken(token.trimmingCharacters(in: .whitespacesAndNewlines))
                         token = ""
                         hasStoredToken = true
-                        Task { await store.refresh(notify: false) }
+                        Task { await store.refresh(notify: false, forceActivity: true) }
                     }
                     .disabled(token.trimmingCharacters(in: .whitespaces).isEmpty)
                     Button("Remove") {
                         Keychain.deleteToken()
                         hasStoredToken = false
-                        Task { await store.refresh(notify: false) }
+                        Task { await store.refresh(notify: false, forceActivity: true) }
                     }
                     .disabled(!hasStoredToken)
                     Spacer()
                     Link("Create token", destination: URL(string: "https://github.com/settings/tokens/new?scopes=user&description=Quotacat")!)
                 }
                 Toggle("Prefer this token over the GitHub CLI login", isOn: $preferPAT)
-                    .onChange(of: preferPAT) { _, _ in Task { await store.refresh(notify: false) } }
+                    .onChange(of: preferPAT) { _, _ in Task { await store.refresh(notify: false, forceActivity: true) } }
             }
         }
         .formStyle(.grouped)
@@ -324,7 +338,7 @@ private struct QuotaSettings: View {
 
     private var planMinutes: Double? { store.plan.flatMap { UsageStore.planActionsMinutes[$0] } }
 
-    private func apply() { Task { await store.refresh(notify: false) } }
+    private func apply() { Task { await store.refresh(notify: false, forceActivity: true) } }
 
     var body: some View {
         Form {

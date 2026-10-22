@@ -211,6 +211,19 @@ struct PopoverView: View {
             Spacer()
             Link("Billing", destination: Links.billing)
             Spacer()
+            Menu {
+                Button("Report a Bug…") { Feedback.reportBug(store: store) }
+                Button("Suggest a Feature…") { Feedback.suggestFeature() }
+                Divider()
+                Button("Copy Diagnostics") { Feedback.copyDiagnostics(store: store) }
+            } label: {
+                Text("Feedback").foregroundStyle(.secondary)   // match the borderless buttons beside it
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Report a bug or suggest a feature")
+            Spacer()
             Link(destination: Links.tip) {
                 Image(systemName: "heart.fill").foregroundStyle(.pink)
             }

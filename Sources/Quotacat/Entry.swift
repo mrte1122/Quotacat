@@ -40,43 +40,7 @@ enum Entry {
         let store = UsageStore()
         Task { @MainActor in
             await store.refresh(notify: false, forceActivity: true)
-            print("login:", store.login ?? "-", "| credential:", store.tokenSource?.rawValue ?? "none",
-                  "| scopes:", store.scopes?.sorted().joined(separator: ",") ?? "n/a")
-            if let e = store.lastError { print("error:", e) }
-            for k in MetricKind.allCases {
-                if let m = store.metrics[k] {
-                    let pace = UsageMath.projectedFraction(used: m.used, limit: m.limit, start: m.periodStart,
-                                                           end: m.resetAt, now: Date())
-                        .map { "\(UsageMath.paceTier(projected: $0).title) (\(Int($0 * 100))%)" } ?? "n/a"
-                    let usage = m.amountText + (m.netAmount.map { $0 > 0 ? String(format: " ($%.2f billed)", $0) : "" } ?? "")
-                    print(pad(m.displayTitle, 26) + pad(usage, 30) + pad("\(Int((m.fraction * 100).rounded()))%", 6)
-                          + pad("resets in \(UsageMath.countdown(to: m.resetAt, now: Date()))", 20) + "pace: \(pace)")
-                } else if let issue = store.issues[k] {
-                    print(pad(k.title, 26) + "unavailable: \(issue)")
-                }
-            }
-            if let b = store.metrics[.actions]?.budget {
-                let runway = b.runway.map { "\(Int($0.minutes)) \($0.runner)" }.joined(separator: " / ")
-                print(String(format: "actions budget: $%.2f of $%.2f%@ | runway: %@ min | projected: %@%@",
-                             b.spent, b.amount, b.stopsUsage ? " (stops Actions)" : "", runway,
-                             b.projectedSpend.map { String(format: "$%.2f", $0) } ?? "n/a",
-                             b.runsOutAt.map { " | runs out ~\($0.formatted(date: .abbreviated, time: .omitted))" } ?? ""))
-            }
-            if let q = store.pullRequests {
-                print("pull requests waiting on you: \(q.waitingOnYouTotal) | yours open: \(q.yoursTotal)")
-                for pr in q.waitingOnYou.prefix(5) + q.yours.prefix(5) {
-                    print("  \(pr.repo) #\(pr.number)  \(UsageMath.age(since: pr.createdAt, now: Date()))  \(pr.reviewDecision?.rawValue ?? (pr.isDraft ? "DRAFT" : "-"))")
-                }
-            } else if let e = store.pullRequestIssue {
-                print("pull requests: unavailable: \(e)")
-            }
-            if let a = store.actions {
-                print("actions: watching \(a.watchedRepos.count) repos, \(a.failing.count) failing")
-                for f in a.failing { print("  \(f.repo)  \(f.workflowName)  \(f.conclusion)") }
-            } else if let e = store.actionsIssue {
-                print("actions: unavailable: \(e)")
-            }
-            print("cache:", UsageStore.cacheURL.path)
+            print(store.diagnosticsText())
             exit(store.lastError == nil ? 0 : 1)
         }
         RunLoop.main.run()
@@ -143,9 +107,5 @@ enum Entry {
         }
         RunLoop.main.run()
         exit(0)
-    }
-
-    private static func pad(_ s: String, _ n: Int) -> String {
-        s.count >= n ? s + " " : s.padding(toLength: n, withPad: " ", startingAt: 0)
     }
 }

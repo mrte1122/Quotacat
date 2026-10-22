@@ -23,6 +23,13 @@ final class UsageStore: ObservableObject {
     @Published private(set) var pullRequests: PullRequestQueue?
     @Published private(set) var pullRequestIssue: String?
     private var lastPullRequestFetch = Date.distantPast
+    /// Account info and billing reports change slowly (GitHub updates billing a few times a day),
+    /// so they're fetched every 10 minutes; the rate-limit check itself is free and runs every refresh.
+    private static let billingInterval: TimeInterval = 600
+    private var lastAccountFetch = Date.distantPast
+    private var lastToken: String?
+    private var billingMetrics: [MetricKind: UsageMetric] = [:]
+    private var billingIssues: [MetricKind: String] = [:]
     @Published private(set) var actions: ActionsStatus?
     @Published private(set) var actionsIssue: String?
     /// Every non-archived repository the token can see, for the Settings picker.
@@ -129,12 +136,18 @@ final class UsageStore: ObservableObject {
         tokenSource = credential.source
         needsSignIn = false
         let client = GitHubClient(token: credential.token)
+        // Re-read the account and billing on demand, after a credential change, or every 10 minutes.
+        let accountDue = forceActivity || login == nil || credential.token != lastToken
+            || Date().timeIntervalSince(lastAccountFetch) >= Self.billingInterval
 
         do {
-            let user = try await client.fetchUser()
-            login = user.login
-            scopes = user.scopes
-            plan = user.plan
+            if accountDue {
+                let user = try await client.fetchUser()
+                login = user.login
+                scopes = user.scopes
+                plan = user.plan
+            }
+            guard let login else { return }
             let limits = try await client.fetchRateLimits()
 
             var newMetrics: [MetricKind: UsageMetric] = [:]
@@ -149,19 +162,25 @@ final class UsageStore: ObservableObject {
                                                periodStart: reset.addingTimeInterval(-length), resetAt: reset)
             }
 
-            if let s = user.scopes, !s.contains("user") {
-                for k in MetricKind.billing { newIssues[k] = GitHubError.needsUserScope.localizedDescription }
-            } else {
-                let (billing, billingIssues) = await loadBilling(client: client, login: user.login,
-                                                                  token: credential.token, plan: user.plan)
-                newMetrics.merge(billing) { $1 }
-                newIssues.merge(billingIssues) { $1 }
+            if accountDue {
+                if let s = scopes, !s.contains("user") {
+                    billingMetrics = [:]
+                    billingIssues = Dictionary(uniqueKeysWithValues: MetricKind.billing.map {
+                        ($0, GitHubError.needsUserScope.localizedDescription) })
+                } else {
+                    (billingMetrics, billingIssues) = await loadBilling(client: client, login: login,
+                                                                        token: credential.token, plan: plan)
+                }
+                lastAccountFetch = Date()
+                lastToken = credential.token
             }
+            newMetrics.merge(billingMetrics) { $1 }
+            newIssues.merge(billingIssues) { $1 }
 
             if UserDefaults.standard.bool(forKey: SettingsKey.pullRequestsEnabled),
                forceActivity || Date().timeIntervalSince(lastPullRequestFetch) >= Self.pullRequestInterval {
                 do {
-                    let queue = try await client.fetchPullRequests(login: user.login)
+                    let queue = try await client.fetchPullRequests(login: login)
                     pullRequests = queue
                     pullRequestIssue = nil
                     lastPullRequestFetch = Date()

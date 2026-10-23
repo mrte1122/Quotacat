@@ -71,6 +71,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            // Activate first: as a menu-bar-only app Quotacat is otherwise never the active app, and
+            // the popover's controls then draw in macOS's dimmed "inactive window" style.
+            NSApp.activate()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
         }

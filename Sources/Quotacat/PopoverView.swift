@@ -230,7 +230,7 @@ struct PopoverView: View {
                 Divider()
                 Button("Copy Diagnostics") { Feedback.copyDiagnostics(store: store) }
             } label: {
-                Text("Feedback").foregroundStyle(.secondary)   // match the borderless buttons beside it
+                Text("Feedback")
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
@@ -267,7 +267,7 @@ struct MetricCard: View {
     }
 
     private var meterColor: Color { Color(ns: Theme.barColor(for: metric, now: now, paceAware: paceColoring)) }
-    private var percentColor: Color { Color(ns: Theme.status(UsageMath.statusLevel(fraction: metric.displayFraction))) }
+    private var percentColor: Color { Color(ns: Theme.readable(Theme.status(UsageMath.statusLevel(fraction: metric.displayFraction)))) }
     private var percentText: String { "\(Int((metric.displayFraction * 100).rounded()))%" }
 
     var body: some View {
@@ -282,7 +282,7 @@ struct MetricCard: View {
             }
         }
         .padding(10)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+        .card()
     }
 
     /// Default layout: title and percentage on one line, a horizontal bar, then the caption.
@@ -295,9 +295,12 @@ struct MetricCard: View {
                 .foregroundStyle(percentColor)
         }
         if let budget = metric.budget {
+            // Used-up included minutes stay a solid brand indigo (grey read as "disabled");
+            // the budget zone carries the pace color.
             TwoStageBar(included: metric.fraction, budget: metric.inBudgetStage ? budget.fraction : 0,
-                        includedColor: metric.inBudgetStage ? Color.secondary.opacity(0.45) : meterColor,
-                        budgetColor: meterColor)
+                        includedColor: metric.inBudgetStage ? Color(ns: .systemIndigo) : meterColor,
+                        budgetColor: meterColor,
+                        budgetLabel: "\(money(budget.amount)) budget")
         } else {
             UsageBar(fraction: metric.fraction, elapsed: elapsed, color: meterColor,
                      markerColor: .primary)  // the bar and caption already carry the pace color
@@ -388,7 +391,7 @@ struct MetricCard: View {
                     let tier = UsageMath.paceTier(projected: p / b.amount)
                     Text(projectionText(b, projected: p))
                         .font(.caption2)
-                        .foregroundStyle(Color(ns: Theme.pace(tier)))
+                        .foregroundStyle(Color(ns: Theme.readable(Theme.pace(tier))))
                 }
             }
         }
@@ -410,7 +413,7 @@ struct MetricCard: View {
             let tier = UsageMath.paceTier(projected: p)
             Text("\(tier.title) · projected \(Int((p * 100).rounded()))% by reset")
                 .font(.caption2)
-                .foregroundStyle(Color(ns: Theme.pace(tier)))
+                .foregroundStyle(Color(ns: Theme.readable(Theme.pace(tier))))
         }
     }
 
@@ -441,18 +444,30 @@ struct TwoStageBar: View {
     let budget: Double
     let includedColor: Color
     let budgetColor: Color
+    var budgetLabel = "Budget"
 
     var body: some View {
         GeometryReader { geo in
             let gap: CGFloat = 3
             let first = (geo.size.width - gap) * 0.6
             let second = geo.size.width - gap - first
-            HStack(spacing: gap) {
-                zone(width: first, fraction: included, color: includedColor).help("Included minutes")
-                zone(width: second, fraction: budget, color: budgetColor).help("Budget")
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: gap) {
+                    zone(width: first, fraction: included, color: includedColor).help("Included minutes")
+                    zone(width: second, fraction: budget, color: budgetColor).help("Budget")
+                }
+                .frame(height: 7)
+                // Name the two zones so the split reads at a glance.
+                HStack(spacing: gap) {
+                    Text("Included").frame(width: first, alignment: .leading)
+                    Text(budgetLabel).frame(width: second, alignment: .leading)
+                }
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
         }
-        .frame(height: 7)
+        .frame(height: 20)
     }
 
     private func zone(width: CGFloat, fraction: Double, color: Color) -> some View {
@@ -511,7 +526,7 @@ struct SignInCard: View {
             }
         }
         .padding(12)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+        .card()
     }
 }
 
@@ -596,6 +611,6 @@ struct IssueRow: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+        .card()
     }
 }

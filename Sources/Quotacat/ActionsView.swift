@@ -25,7 +25,7 @@ struct ActionsView: View {
                             FailingWorkflowRow(failure: f, now: now)
                         }
                     }
-                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                    .card()
                 }
                 HStack {
                     Text("Watching \(status.watchedRepos.count) \(status.watchedRepos.count == 1 ? "repository" : "repositories")")
@@ -56,7 +56,7 @@ struct ActionsView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+        .card()
     }
 }
 

@@ -38,7 +38,7 @@ struct PullRequestsView: View {
                 Text(empty).font(.callout).foregroundStyle(.secondary)
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                    .card()
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(items.prefix(Self.maxRows).enumerated()), id: \.element.id) { index, pr in
@@ -53,7 +53,7 @@ struct PullRequestsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                .card()
             }
         }
     }

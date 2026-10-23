@@ -76,6 +76,11 @@ extension UsageStore {
         var out: [String] = []
         out.append("Quotacat \(SystemInfo.appVersion) | \(SystemInfo.macOS) | \(SystemInfo.chip)")
         if let problem = Updater.installLocationProblem { out.append("install location: \(problem)") }
+        if Updater.isTranslocated {
+            out.append("moved copy in Applications: \(Updater.movedCopyURL?.path ?? "none yet")")
+        } else if Updater.installMode == .replaceContents {
+            out.append("install location: updates replace the app's contents (folder isn't writable by this account)")
+        }
         out.append("login: \(login ?? "-") | credential: \(tokenSource?.rawValue ?? "none") | "
                    + "scopes: \(scopes?.sorted().joined(separator: ",") ?? "n/a") | plan: \(plan ?? "n/a")")
         if let u = lastUpdated { out.append("updated: \(u.formatted(date: .abbreviated, time: .standard))") }

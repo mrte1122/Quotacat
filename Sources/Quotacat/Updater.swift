@@ -55,13 +55,54 @@ final class Updater: ObservableObject {
     nonisolated static var installLocationProblem: String? {
         let url = Bundle.main.bundleURL
         guard url.pathExtension == "app" else { return "Quotacat isn't running from an app bundle." }
-        if url.path.contains("/AppTranslocation/") {
+        if isTranslocated {
             return "macOS is running a temporary, read-only copy of Quotacat because it wasn't moved out of the folder it was downloaded to."
         }
-        if !FileManager.default.isWritableFile(atPath: url.deletingLastPathComponent().path) {
-            return "Quotacat is in a folder it can't write to."
+        if installMode == nil {
+            return "This account can't change apps in this folder, so updates need an administrator or a manual download."
         }
         return nil
+    }
+
+    /// Opened straight from Downloads: macOS runs a read-only "App Translocation" copy.
+    nonisolated static var isTranslocated: Bool { Bundle.main.bundleURL.path.contains("/AppTranslocation/") }
+
+    /// While running translocated: a copy the user has since moved into an Applications folder,
+    /// so the banner can offer to relaunch from there instead of repeating "move it".
+    nonisolated static var movedCopyURL: URL? {
+        guard isTranslocated else { return nil }
+        let candidates = ["/Applications/Quotacat.app", NSString(string: "~/Applications/Quotacat.app").expandingTildeInPath]
+        return candidates.map { URL(fileURLWithPath: $0) }
+            .first { FileManager.default.fileExists(atPath: $0.appendingPathComponent("Contents/MacOS/Quotacat").path) }
+    }
+
+    enum InstallMode {
+        /// Swap the whole bundle (the folder holding it is writable).
+        case replaceBundle
+        /// Swap only Contents/. A standard (non-admin) user can't write to /Applications itself,
+        /// but owns the Quotacat.app they put there, so its contents can still be replaced.
+        case replaceContents
+    }
+
+    nonisolated static var installMode: InstallMode? {
+        let fm = FileManager.default
+        let url = Bundle.main.bundleURL
+        guard url.pathExtension == "app", !isTranslocated else { return nil }
+        if fm.isWritableFile(atPath: url.deletingLastPathComponent().path) { return .replaceBundle }
+        if fm.isWritableFile(atPath: url.path), fm.isWritableFile(atPath: url.appendingPathComponent("Contents").path) {
+            return .replaceContents
+        }
+        return nil
+    }
+
+    /// Opens the moved copy and quits this translocated one.
+    static func relaunchFromMovedCopy() {
+        guard let target = movedCopyURL else { return }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "sleep 1; /usr/bin/open -n \"$0\"", target.path]
+        try? p.run()
+        NSApp.terminate(nil)
     }
 
     static var currentVersion: String {
@@ -192,7 +233,13 @@ final class Updater: ObservableObject {
             state = .installing("Installing…")
             _ = try? await Self.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", newApp.path])
             do {
-                _ = try fm.replaceItemAt(current, withItemAt: newApp)
+                switch Self.installMode {
+                case .replaceContents:
+                    _ = try fm.replaceItemAt(current.appendingPathComponent("Contents"),
+                                             withItemAt: newApp.appendingPathComponent("Contents"))
+                default:
+                    _ = try fm.replaceItemAt(current, withItemAt: newApp)
+                }
             } catch {
                 throw UpdateError.install("\(error.localizedDescription) Download it manually from the releases page instead.")
             }

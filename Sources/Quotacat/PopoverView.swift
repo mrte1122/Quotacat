@@ -104,21 +104,34 @@ struct PopoverView: View {
     // Mirrors Claude Usage's StatusBannerView: "Refresh failed %d times", credentials problems.
     // Shown only when there's something to act on; "up to date" stays in Settings.
     /// Updates can't install from a translocated or read-only copy, so say how to fix it up front.
+    /// Only for a translocated copy (opened from Downloads). Other "can't update here" cases, such as
+    /// a standard user's /Applications, don't need a banner: the update banner offers a download.
     @ViewBuilder private var locationBanner: some View {
-        if Updater.installLocationProblem != nil {
+        if Updater.isTranslocated {
             VStack(alignment: .leading, spacing: 6) {
-                Label("Move Quotacat to Applications", systemImage: "folder.badge.plus")
-                    .font(.callout.weight(.medium))
-                Text("It's running from a temporary copy, so updates can't install. Quit Quotacat, drag it from Downloads into Applications, and open it from there.")
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack {
-                    Button("Open Applications Folder") {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
+                if Updater.movedCopyURL != nil {
+                    Label("Quotacat is in Applications now", systemImage: "checkmark.circle")
+                        .font(.callout.weight(.medium))
+                    Text("This window is still the temporary copy that was opened from Downloads. Relaunch to switch to the one in Applications.")
+                        .font(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Relaunch from Applications") { Updater.relaunchFromMovedCopy() }
+                        .controlSize(.small)
+                        .buttonStyle(.borderedProminent)
+                } else {
+                    Label("Move Quotacat to Applications", systemImage: "folder.badge.plus")
+                        .font(.callout.weight(.medium))
+                    Text("It's running from a temporary copy, so updates can't install. Drag Quotacat from Downloads into Applications; this banner will then offer to relaunch it from there.")
+                        .font(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Button("Open Applications Folder") {
+                            NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
+                        }
+                        Button("Quit Quotacat") { NSApp.terminate(nil) }
                     }
-                    Button("Quit Quotacat") { NSApp.terminate(nil) }
+                    .controlSize(.small)
                 }
-                .controlSize(.small)
             }
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -353,7 +366,12 @@ struct MetricCard: View {
 
     /// Budget runway and projection (Actions with a budget configured).
     @ViewBuilder private var budgetLines: some View {
-        if let b = metric.budget {
+        if metric.kind == .actions, metric.budget == nil, metric.limit > 0, metric.used >= metric.limit * 0.999 {
+            // GitHub doesn't expose personal budgets, so a full bar may hide real runway.
+            Text("Included minutes used up. Have an Actions budget on GitHub? Add it in Settings → Quotas to see how much runway it gives you.")
+                .font(.caption2).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if let b = metric.budget {
             if !metric.inBudgetStage {
                 Text("Then a \(money(b.amount)) budget\(b.stopsUsage ? "; Actions stops when it runs out" : "")")
                     .font(.caption2).foregroundStyle(.secondary)

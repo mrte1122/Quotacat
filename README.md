@@ -92,8 +92,11 @@ Also included:
 Or with [Homebrew](https://brew.sh):
 
 ```bash
+brew trust mrte1122/tap
 brew install --cask mrte1122/tap/quotacat
 ```
+
+Recent Homebrew versions only load casks from third-party taps you've trusted, hence the first line; you only need it once.
 
 From the download:
 
